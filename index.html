@@ -283,6 +283,11 @@
       <option value="Existing Customer">Existing Customer</option>
     </select>
 
+    <div id="followup-date-group" style="display:none">
+      <label>Follow-up Date</label>
+      <input type="date" id="modal-followup-date"/>
+    </div>
+
     <label>Notes <span style="font-weight:normal;color:#aaa;">(optional)</span></label>
     <textarea id="modal-notes" placeholder="Any details from the conversation…"></textarea>
 
@@ -397,8 +402,11 @@ function buildContactHistory(id) {
     .map(c => {
       const date = new Date(c.contacted_at).toLocaleDateString('en-GB');
       const borderColor = STATUS[c.outcome]?.stroke || '#ccc';
+      const due = c.follow_up_date
+        ? ` · <span style="color:#e67e22">Due ${new Date(c.follow_up_date + 'T00:00:00').toLocaleDateString('en-GB')}</span>`
+        : '';
       return `<div class="contact-entry" style="border-left-color:${borderColor}">
-        <span class="outcome">${c.outcome}</span> · ${c.employee} · ${date}
+        <span class="outcome">${c.outcome}</span> · ${c.employee} · ${date}${due}
         ${c.notes ? `<br><span style="color:#777">${c.notes}</span>` : ''}
       </div>`;
     }).join('');
@@ -532,13 +540,27 @@ async function loadContacts() {
 
 /* ── Modal ───────────────────────────────────────────────── */
 function openModal(id, name) {
-  document.getElementById('modal-installer-id').value   = id;
+  document.getElementById('modal-installer-id').value        = id;
   document.getElementById('modal-installer-name').textContent = name;
-  document.getElementById('modal-employee').value       = '';
-  document.getElementById('modal-outcome').value        = '';
-  document.getElementById('modal-notes').value          = '';
+  document.getElementById('modal-employee').value            = '';
+  document.getElementById('modal-outcome').value             = '';
+  document.getElementById('modal-notes').value               = '';
+  document.getElementById('modal-followup-date').value       = '';
+  document.getElementById('followup-date-group').style.display = 'none';
   document.getElementById('modal-overlay').classList.add('open');
 }
+
+document.getElementById('modal-outcome').addEventListener('change', e => {
+  const group = document.getElementById('followup-date-group');
+  if (e.target.value === 'Follow Up') {
+    group.style.display = 'block';
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    document.getElementById('modal-followup-date').value = tomorrow.toISOString().slice(0, 10);
+  } else {
+    group.style.display = 'none';
+  }
+});
 
 document.getElementById('modal-cancel').addEventListener('click', () => {
   document.getElementById('modal-overlay').classList.remove('open');
@@ -562,8 +584,13 @@ document.getElementById('modal-submit').addEventListener('click', async () => {
   const btn = document.getElementById('modal-submit');
   btn.disabled = true; btn.textContent = 'Saving…';
 
+  const followUpDate = outcome === 'Follow Up'
+    ? (document.getElementById('modal-followup-date').value || null)
+    : null;
+
   const { data, error } = await db.from('contacts').insert([{
     installer_id: id, installer_name: name, employee, outcome, notes,
+    follow_up_date: followUpDate,
   }]).select();
 
   btn.disabled = false; btn.textContent = 'Save Contact';
