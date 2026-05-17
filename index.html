@@ -9,76 +9,60 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-
     body { display: flex; height: 100vh; font-family: Arial, sans-serif; overflow: hidden; }
 
-    /* ── Sidebar ────────────────────────────────────────────── */
+    /* ── Sidebar ─────────────────────────────────────────── */
     #sidebar {
       width: 300px; min-width: 300px;
-      background: #0f1d2b;
-      color: #cde;
+      background: #0f1d2b; color: #cde;
       display: flex; flex-direction: column;
       overflow-y: auto; z-index: 1000;
     }
-
-    #sidebar-header {
-      background: #1a5276;
-      padding: 18px 16px;
-      flex-shrink: 0;
-    }
+    #sidebar-header { background: #1a5276; padding: 18px 16px; flex-shrink: 0; }
     #sidebar-header h1 { font-size: 17px; color: #fff; }
     #sidebar-header p  { font-size: 11px; color: #acd4f5; margin-top: 3px; }
 
     #count-bar {
-      background: #0d1822;
-      padding: 10px 16px;
+      background: #0d1822; padding: 10px 16px;
       font-size: 13px; color: #7aaccc;
-      border-bottom: 1px solid #1e3045;
-      flex-shrink: 0;
+      border-bottom: 1px solid #1e3045; flex-shrink: 0;
     }
     #count-bar strong { color: #fff; font-size: 18px; }
 
-    .section {
-      padding: 14px 16px;
-      border-bottom: 1px solid #1e3045;
-    }
+    .section { padding: 14px 16px; border-bottom: 1px solid #1e3045; }
     .section h3 {
       font-size: 10px; text-transform: uppercase;
-      letter-spacing: 1.2px; color: #4a7a9b;
-      margin-bottom: 10px;
+      letter-spacing: 1.2px; color: #4a7a9b; margin-bottom: 10px;
     }
 
     #search {
       width: 100%; padding: 8px 10px;
       border-radius: 6px; border: 1px solid #1e3045;
-      background: #07111c; color: #fff; font-size: 13px;
-      outline: none;
+      background: #07111c; color: #fff; font-size: 13px; outline: none;
     }
     #search::placeholder { color: #3a6080; }
     #search:focus { border-color: #1a5276; }
 
+    #status-filter {
+      width: 100%; padding: 8px 10px;
+      border-radius: 6px; border: 1px solid #1e3045;
+      background: #07111c; color: #fff; font-size: 13px; outline: none;
+    }
+
     .tech-row {
-      display: flex; align-items: center;
-      padding: 5px 0; cursor: pointer;
-      font-size: 13px; color: #9bbdd0;
-      user-select: none;
+      display: flex; align-items: center; padding: 5px 0;
+      cursor: pointer; font-size: 13px; color: #9bbdd0; user-select: none;
     }
     .tech-row:hover { color: #fff; }
     .tech-row input { margin-right: 8px; cursor: pointer; accent-color: #1a5276; }
-    .dot {
-      width: 10px; height: 10px; border-radius: 50%;
-      margin-right: 8px; flex-shrink: 0;
-    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; flex-shrink: 0; }
     .tech-n { margin-left: auto; font-size: 11px; color: #3a5e75; }
 
-    /* BUS toggle */
+    /* Toggle switch */
     .toggle-row { display: flex; align-items: center; gap: 10px; font-size: 13px; cursor: pointer; }
     .switch { position: relative; width: 38px; height: 20px; flex-shrink: 0; }
     .switch input { opacity: 0; width: 0; height: 0; }
-    .slider {
-      position: absolute; inset: 0;
-      background: #1e3045; border-radius: 20px; transition: .3s; cursor: pointer;
-    }
+    .slider { position: absolute; inset: 0; background: #1e3045; border-radius: 20px; transition: .3s; cursor: pointer; }
     .slider:before {
       content: ""; position: absolute;
       width: 14px; height: 14px; border-radius: 50%;
@@ -87,24 +71,28 @@
     .switch input:checked + .slider { background: #1a7a4a; }
     .switch input:checked + .slider:before { transform: translateX(18px); }
 
+    /* Pipeline stats */
+    .stat-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 5px 0; font-size: 12px; color: #9bbdd0;
+    }
+    .stat-dot { width: 9px; height: 9px; border-radius: 50%; margin-right: 7px; flex-shrink: 0; }
+    .stat-label { display: flex; align-items: center; flex: 1; }
+    .stat-n { font-size: 12px; font-weight: bold; color: #fff; }
+
     #reset {
-      margin: 14px 16px;
-      padding: 8px; width: calc(100% - 32px);
-      background: #1a5276; color: #fff;
-      border: none; border-radius: 6px;
-      font-size: 13px; cursor: pointer;
+      margin: 14px 16px; padding: 8px; width: calc(100% - 32px);
+      background: #1a5276; color: #fff; border: none;
+      border-radius: 6px; font-size: 13px; cursor: pointer;
     }
     #reset:hover { background: #2472a4; }
 
-    #footer {
-      margin-top: auto; padding: 14px 16px;
-      font-size: 11px; color: #2a4a60; line-height: 1.6;
-    }
+    #footer { margin-top: auto; padding: 14px 16px; font-size: 11px; color: #2a4a60; line-height: 1.6; }
 
-    /* ── Map ─────────────────────────────────────────────────── */
+    /* ── Map ──────────────────────────────────────────────── */
     #map { flex: 1; }
 
-    /* ── Loading overlay ─────────────────────────────────────── */
+    /* ── Loading ──────────────────────────────────────────── */
     #loading {
       position: fixed; inset: 0;
       background: rgba(10,20,30,.85);
@@ -114,39 +102,76 @@
     }
     .spinner {
       width: 40px; height: 40px;
-      border: 4px solid #1a5276;
-      border-top-color: #5dade2;
-      border-radius: 50%;
-      animation: spin .8s linear infinite;
+      border: 4px solid #1a5276; border-top-color: #5dade2;
+      border-radius: 50%; animation: spin .8s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── Popup ───────────────────────────────────────────────── */
-    .popup { font-size: 13px; min-width: 230px; max-width: 290px; }
+    /* ── Popup ────────────────────────────────────────────── */
+    .popup { font-size: 13px; min-width: 240px; max-width: 300px; }
     .popup-name {
       font-size: 14px; font-weight: bold; color: #1a5276;
       padding-bottom: 7px; margin-bottom: 8px;
       border-bottom: 1px solid #eee;
       display: flex; align-items: center; flex-wrap: wrap; gap: 5px;
     }
-    .bus-pill {
-      font-size: 10px; background: #1a5276; color: #fff;
-      padding: 2px 7px; border-radius: 10px;
-    }
+    .bus-pill { font-size: 10px; background: #1a5276; color: #fff; padding: 2px 7px; border-radius: 10px; }
     .tags { margin-bottom: 9px; }
-    .tag {
-      display: inline-block; color: #fff; font-size: 10px;
-      padding: 2px 7px; border-radius: 10px;
-      margin: 2px 2px 2px 0;
-    }
+    .tag { display: inline-block; color: #fff; font-size: 10px; padding: 2px 7px; border-radius: 10px; margin: 2px 2px 2px 0; }
     .popup p { margin: 4px 0; color: #444; word-break: break-word; }
     .popup a { color: #1a5276; }
-    .cert-line { margin-top: 7px; font-size: 11px; color: #999; }
+    .cert-line { margin-top: 5px; font-size: 11px; color: #999; }
+
+    /* Contact history inside popup */
+    .contact-section { margin-top: 10px; border-top: 1px solid #eee; padding-top: 9px; }
+    .contact-section-title { font-size: 11px; font-weight: bold; color: #555; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .5px; }
+    .contact-entry {
+      font-size: 11px; color: #555; margin-bottom: 5px;
+      padding: 5px 7px; background: #f7f7f7; border-radius: 5px;
+      border-left: 3px solid #ccc;
+    }
+    .contact-entry .outcome { font-weight: bold; }
+    .no-contacts { font-size: 11px; color: #aaa; font-style: italic; }
+    .log-btn {
+      margin-top: 9px; width: 100%; padding: 8px;
+      background: #1a5276; color: #fff; border: none;
+      border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold;
+    }
+    .log-btn:hover { background: #2472a4; }
+
+    /* ── Modal ────────────────────────────────────────────── */
+    #modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.55); z-index: 9998;
+      align-items: center; justify-content: center;
+    }
+    #modal-overlay.open { display: flex; }
+    #modal {
+      background: #fff; border-radius: 10px;
+      padding: 26px; width: 430px; max-width: 92vw;
+      box-shadow: 0 20px 60px rgba(0,0,0,.3);
+    }
+    #modal h2 { font-size: 16px; color: #1a5276; margin-bottom: 4px; }
+    #modal .modal-sub { font-size: 12px; color: #888; margin-bottom: 18px; }
+    #modal label { display: block; font-size: 12px; font-weight: bold; color: #555; margin-bottom: 4px; }
+    #modal input, #modal select, #modal textarea {
+      width: 100%; padding: 9px 11px;
+      border: 1px solid #ddd; border-radius: 6px;
+      font-size: 13px; margin-bottom: 14px; outline: none;
+      font-family: Arial, sans-serif;
+    }
+    #modal input:focus, #modal select:focus, #modal textarea:focus { border-color: #1a5276; }
+    #modal textarea { height: 80px; resize: vertical; }
+    .modal-btns { display: flex; gap: 10px; justify-content: flex-end; margin-top: 4px; }
+    .btn-primary { background: #1a5276; color: #fff; border: none; padding: 9px 22px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; }
+    .btn-primary:hover { background: #2472a4; }
+    .btn-secondary { background: #eee; color: #333; border: none; padding: 9px 22px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+    .btn-secondary:hover { background: #ddd; }
   </style>
 </head>
 <body>
 
-<!-- Sidebar -->
+<!-- ── Sidebar ───────────────────────────────────────────── -->
 <div id="sidebar">
   <div id="sidebar-header">
     <h1>MCS Installer Map</h1>
@@ -163,6 +188,19 @@
   </div>
 
   <div class="section">
+    <h3>Contact Status</h3>
+    <select id="status-filter">
+      <option value="all">All installers</option>
+      <option value="none">Not yet contacted</option>
+      <option value="Interested">Interested</option>
+      <option value="Follow Up">Follow Up</option>
+      <option value="Converted">Converted to Customer</option>
+      <option value="Not Interested">Not Interested</option>
+      <option value="No Answer">No Answer</option>
+    </select>
+  </div>
+
+  <div class="section">
     <h3>Technology</h3>
     <div id="tech-list"></div>
   </div>
@@ -170,10 +208,7 @@
   <div class="section">
     <h3>Scheme</h3>
     <label class="toggle-row">
-      <div class="switch">
-        <input type="checkbox" id="bus-toggle"/>
-        <span class="slider"></span>
-      </div>
+      <div class="switch"><input type="checkbox" id="bus-toggle"/><span class="slider"></span></div>
       BUS Registered only
     </label>
   </div>
@@ -181,12 +216,19 @@
   <div class="section">
     <h3>Delivery Area</h3>
     <label class="toggle-row">
-      <div class="switch">
-        <input type="checkbox" id="radius-toggle"/>
-        <span class="slider"></span>
-      </div>
+      <div class="switch"><input type="checkbox" id="radius-toggle"/><span class="slider"></span></div>
       Show 50-mile free delivery radius
     </label>
+  </div>
+
+  <div class="section">
+    <h3>Contact Pipeline</h3>
+    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#bdc3c7"></span>Not contacted</span><span class="stat-n" id="stat-none">–</span></div>
+    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#bdc3c7"></span>No Answer</span><span class="stat-n" id="stat-noanswer">–</span></div>
+    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#f39c12"></span>Interested</span><span class="stat-n" id="stat-interested">–</span></div>
+    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#e67e22"></span>Follow Up</span><span class="stat-n" id="stat-followup">–</span></div>
+    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#27ae60"></span>Converted</span><span class="stat-n" id="stat-converted">–</span></div>
+    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#7f8c8d"></span>Not Interested</span><span class="stat-n" id="stat-notinterested">–</span></div>
   </div>
 
   <button id="reset">Reset Filters</button>
@@ -197,19 +239,58 @@
   </div>
 </div>
 
-<!-- Map -->
+<!-- ── Map ───────────────────────────────────────────────── -->
 <div id="map"></div>
 
-<!-- Loading -->
+<!-- ── Loading ───────────────────────────────────────────── -->
 <div id="loading">
   <div class="spinner"></div>
   <span>Loading installer data…</span>
 </div>
 
+<!-- ── Log Contact Modal ──────────────────────────────────── -->
+<div id="modal-overlay">
+  <div id="modal">
+    <h2>Log Contact</h2>
+    <p class="modal-sub" id="modal-installer-name"></p>
+    <input type="hidden" id="modal-installer-id"/>
+
+    <label>Your Name</label>
+    <input type="text" id="modal-employee" placeholder="Enter your name…"/>
+
+    <label>Outcome</label>
+    <select id="modal-outcome">
+      <option value="">-- Select outcome --</option>
+      <option value="No Answer">No Answer</option>
+      <option value="Interested">Interested</option>
+      <option value="Follow Up">Follow Up</option>
+      <option value="Not Interested">Not Interested</option>
+      <option value="Converted">Converted to Customer</option>
+    </select>
+
+    <label>Notes <span style="font-weight:normal;color:#aaa;">(optional)</span></label>
+    <textarea id="modal-notes" placeholder="Any details from the conversation…"></textarea>
+
+    <div class="modal-btns">
+      <button class="btn-secondary" id="modal-cancel">Cancel</button>
+      <button class="btn-primary" id="modal-submit">Save Contact</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
-/* ── Technology config ───────────────────────────────────────── */
+
+/* ── Supabase ────────────────────────────────────────────── */
+const { createClient } = supabase;
+const db = createClient(
+  'https://teezsldwkpwzgvfizial.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRlZXpzbGR3a3B3emd2Zml6aWFsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5NzUxMjAsImV4cCI6MjA5NDU1MTEyMH0.8rRoiHuS98HZp4jHSYbL31J3O9fn36tKEy9ooosPoGU'
+);
+
+/* ── Technology config ───────────────────────────────────── */
 const TECHS = {
   "Air Source Heat Pump":     "#27ae60",
   "Ground Source Heat Pump":  "#1e8449",
@@ -232,7 +313,16 @@ function primaryColor(techs) {
   return "#7f8c8d";
 }
 
-/* ── Map setup ───────────────────────────────────────────────── */
+/* ── Contact status config ───────────────────────────────── */
+const STATUS = {
+  "Interested":     { stroke: "#f39c12", weight: 3 },
+  "Follow Up":      { stroke: "#e67e22", weight: 3 },
+  "Converted":      { stroke: "#27ae60", weight: 3.5 },
+  "Not Interested": { stroke: "#7f8c8d", weight: 2.5 },
+  "No Answer":      { stroke: "#bdc3c7", weight: 2.5 },
+};
+
+/* ── Map setup ───────────────────────────────────────────── */
 const map = L.map("map", { center: [54.5, -3.5], zoom: 6 });
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a> contributors',
@@ -240,86 +330,118 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 }).addTo(map);
 document.querySelector('.leaflet-tile-pane').style.filter = 'saturate(0.35) brightness(1.05)';
 
-// Delivery radius — DN2 4NH (Doncaster warehouse), 50 miles
 const WAREHOUSE = [53.5246, -1.0826];
-const RADIUS_M  = 50 * 1609.344;
 const radiusCircle = L.circle(WAREHOUSE, {
-  radius:      RADIUS_M,
-  color:       "#1a5276",
-  weight:      2,
-  dashArray:   "8 6",
-  fillColor:   "#1a5276",
-  fillOpacity: 0.06,
+  radius: 50 * 1609.344,
+  color: "#1a5276", weight: 2, dashArray: "8 6",
+  fillColor: "#1a5276", fillOpacity: 0.06,
 });
 
 const cluster = L.markerClusterGroup({ chunkedLoading: true, maxClusterRadius: 50 });
 map.addLayer(cluster);
 
-/* ── State ───────────────────────────────────────────────────── */
-let allMarkers = [];
-let activeTechs = new Set(TECH_ORDER);
-let busOnly = false;
-let searchTerm = "";
+/* ── State ───────────────────────────────────────────────── */
+let allMarkers   = [];
+let contactMap   = {};   // installer_id → [contacts]
+let activeTechs  = new Set(TECH_ORDER);
+let busOnly      = false;
+let searchTerm   = "";
+let statusFilter = "all";
 
-/* ── Popup builder ───────────────────────────────────────────── */
+/* ── Marker helpers ──────────────────────────────────────── */
+function latestContact(id) {
+  const list = contactMap[id];
+  if (!list || !list.length) return null;
+  return list.reduce((a, b) => new Date(a.contacted_at) > new Date(b.contacted_at) ? a : b);
+}
+
+function applyMarkerStyle(marker) {
+  const latest = latestContact(marker._d.id);
+  const fill   = primaryColor(marker._d.techs);
+  if (latest && STATUS[latest.outcome]) {
+    marker.setStyle({ fillColor: fill, color: STATUS[latest.outcome].stroke, weight: STATUS[latest.outcome].weight, fillOpacity: 0.9 });
+  } else {
+    marker.setStyle({ fillColor: fill, color: "#fff", weight: 1.5, fillOpacity: 0.85 });
+  }
+}
+
+/* ── Popup builder ───────────────────────────────────────── */
+function buildContactHistory(id) {
+  const list = contactMap[id];
+  if (!list || !list.length) return '<p class="no-contacts">No contacts logged yet.</p>';
+  return [...list]
+    .sort((a, b) => new Date(b.contacted_at) - new Date(a.contacted_at))
+    .slice(0, 4)
+    .map(c => {
+      const date = new Date(c.contacted_at).toLocaleDateString('en-GB');
+      const borderColor = STATUS[c.outcome]?.stroke || '#ccc';
+      return `<div class="contact-entry" style="border-left-color:${borderColor}">
+        <span class="outcome">${c.outcome}</span> · ${c.employee} · ${date}
+        ${c.notes ? `<br><span style="color:#777">${c.notes}</span>` : ''}
+      </div>`;
+    }).join('');
+}
+
 function buildPopup(d) {
-  const bus   = d.bus ? '<span class="bus-pill">BUS</span>' : "";
-  const tags  = d.techs.map(t => `<span class="tag" style="background:${TECHS[t]||'#555'}">${t}</span>`).join("");
-  const phone = d.phone   ? `<p>📞 <a href="tel:${d.phone}">${d.phone}</a></p>` : "";
-  const email = d.email   ? `<p>✉️ <a href="mailto:${d.email}">${d.email}</a></p>` : "";
-  const site  = d.website ? `<p>🌐 <a href="${d.website}" target="_blank" rel="noopener">${d.website}</a></p>` : "";
-  const mapsHref = d.postcode
+  const bus   = d.bus ? '<span class="bus-pill">BUS</span>' : '';
+  const tags  = d.techs.map(t => `<span class="tag" style="background:${TECHS[t]||'#555'}">${t}</span>`).join('');
+  const phone = d.phone   ? `<p>📞 <a href="tel:${d.phone}">${d.phone}</a></p>` : '';
+  const email = d.email   ? `<p>✉️ <a href="mailto:${d.email}">${d.email}</a></p>` : '';
+  const site  = d.website ? `<p>🌐 <a href="${d.website}" target="_blank" rel="noopener">${d.website}</a></p>` : '';
+  const maps  = d.postcode
     ? `https://www.google.com/maps/search/${encodeURIComponent(d.postcode)}`
     : `https://www.google.com/maps/search/${encodeURIComponent(d.address)}`;
-  const addr  = `<p>📍 <a href="${mapsHref}" target="_blank" rel="noopener">${d.address}</a></p>`;
-  const cert  = d.cert ? `<p class="cert-line">${d.cert_body} · ${d.cert}</p>` : "";
+  const addr  = `<p>📍 <a href="${maps}" target="_blank" rel="noopener">${d.address}</a></p>`;
+  const cert  = d.cert ? `<p class="cert-line">${d.cert_body} · ${d.cert}</p>` : '';
+
   return `
     <div class="popup">
       <div class="popup-name">${d.name} ${bus}</div>
       <div class="tags">${tags}</div>
       ${phone}${email}${site}${addr}${cert}
+      <div class="contact-section">
+        <div class="contact-section-title">Contact History</div>
+        ${buildContactHistory(d.id)}
+        <button class="log-btn" onclick="openModal('${d.id}','${d.name.replace(/'/g,"\\'")}')">+ Log Contact</button>
+      </div>
     </div>`;
 }
 
-/* ── Initialise map from data ────────────────────────────────── */
+/* ── Initialise map ──────────────────────────────────────── */
 function initMap(data) {
-  document.getElementById("loading").style.display = "none";
   document.getElementById("total").textContent = data.length.toLocaleString();
-
   data.forEach(d => {
     if (!d.lat || !d.lng) return;
-    const color  = primaryColor(d.techs);
     const marker = L.circleMarker([d.lat, d.lng], {
-      radius: 7, fillColor: color,
-      color: "#fff", weight: 1.5,
-      opacity: 1, fillOpacity: 0.85,
+      radius: 7, fillColor: primaryColor(d.techs),
+      color: "#fff", weight: 1.5, opacity: 1, fillOpacity: 0.85,
     });
     marker.bindTooltip(d.name, { direction: "top", offset: [0, -5] });
-    marker.bindPopup(buildPopup(d), { maxWidth: 310 });
     marker._d = d;
     allMarkers.push(marker);
     cluster.addLayer(marker);
   });
-
   buildTechList(data);
   updateCount();
 }
 
-/* ── Sidebar: technology checkboxes ─────────────────────────── */
+function openPopup(marker) {
+  marker.bindPopup(buildPopup(marker._d), { maxWidth: 320 }).openPopup();
+}
+
+/* ── Tech filters ────────────────────────────────────────── */
 function buildTechList(data) {
   const counts = {};
   data.forEach(d => d.techs.forEach(t => { counts[t] = (counts[t] || 0) + 1; }));
-
   const el = document.getElementById("tech-list");
   TECH_ORDER.forEach(tech => {
-    const n = counts[tech] || 0;
     const row = document.createElement("label");
     row.className = "tech-row";
     row.innerHTML = `
       <input type="checkbox" checked data-tech="${tech}"/>
       <span class="dot" style="background:${TECHS[tech]}"></span>
       ${tech}
-      <span class="tech-n">${n.toLocaleString()}</span>`;
+      <span class="tech-n">${(counts[tech]||0).toLocaleString()}</span>`;
     row.querySelector("input").addEventListener("change", e => {
       e.target.checked ? activeTechs.add(tech) : activeTechs.delete(tech);
       applyFilters();
@@ -328,19 +450,26 @@ function buildTechList(data) {
   });
 }
 
-/* ── Filter logic ────────────────────────────────────────────── */
+/* ── Filter logic ────────────────────────────────────────── */
 function applyFilters() {
   const term = searchTerm.toLowerCase();
   cluster.clearLayers();
   let shown = 0;
   allMarkers.forEach(m => {
-    const d = m._d;
+    const d      = m._d;
+    const latest = latestContact(d.id);
+    const outcome = latest ? latest.outcome : null;
+
     const techOk   = d.techs.some(t => activeTechs.has(t));
     const busOk    = !busOnly || d.bus;
-    const searchOk = !term ||
-      d.name.toLowerCase().includes(term) ||
-      (d.postcode || "").toLowerCase().includes(term);
-    if (techOk && busOk && searchOk) { cluster.addLayer(m); shown++; }
+    const searchOk = !term || d.name.toLowerCase().includes(term) || (d.postcode||'').toLowerCase().includes(term);
+    const statusOk = statusFilter === 'all'
+      ? true
+      : statusFilter === 'none'
+        ? !outcome
+        : outcome === statusFilter;
+
+    if (techOk && busOk && searchOk && statusOk) { cluster.addLayer(m); shown++; }
   });
   document.getElementById("shown").textContent = shown.toLocaleString();
 }
@@ -349,41 +478,129 @@ function updateCount() {
   document.getElementById("shown").textContent = allMarkers.length.toLocaleString();
 }
 
-/* ── Event listeners ─────────────────────────────────────────── */
-document.getElementById("search").addEventListener("input", e => {
-  searchTerm = e.target.value;
-  applyFilters();
+/* ── Contact pipeline stats ──────────────────────────────── */
+function updateContactStats() {
+  const counts = { none: 0, "No Answer": 0, "Interested": 0, "Follow Up": 0, "Converted": 0, "Not Interested": 0 };
+  allMarkers.forEach(m => {
+    const latest = latestContact(m._d.id);
+    if (!latest) counts.none++;
+    else counts[latest.outcome] = (counts[latest.outcome] || 0) + 1;
+  });
+  document.getElementById("stat-none").textContent        = counts.none.toLocaleString();
+  document.getElementById("stat-noanswer").textContent    = (counts["No Answer"]||0).toLocaleString();
+  document.getElementById("stat-interested").textContent  = (counts["Interested"]||0).toLocaleString();
+  document.getElementById("stat-followup").textContent    = (counts["Follow Up"]||0).toLocaleString();
+  document.getElementById("stat-converted").textContent   = (counts["Converted"]||0).toLocaleString();
+  document.getElementById("stat-notinterested").textContent = (counts["Not Interested"]||0).toLocaleString();
+}
+
+/* ── Load contacts from Supabase ─────────────────────────── */
+async function loadContacts() {
+  const { data, error } = await db.from('contacts').select('*').order('contacted_at', { ascending: false });
+  if (error) { console.warn('Could not load contacts:', error); return; }
+  contactMap = {};
+  data.forEach(c => {
+    if (!contactMap[c.installer_id]) contactMap[c.installer_id] = [];
+    contactMap[c.installer_id].push(c);
+  });
+  allMarkers.forEach(applyMarkerStyle);
+  updateContactStats();
+}
+
+/* ── Modal ───────────────────────────────────────────────── */
+function openModal(id, name) {
+  document.getElementById('modal-installer-id').value   = id;
+  document.getElementById('modal-installer-name').textContent = name;
+  document.getElementById('modal-employee').value       = '';
+  document.getElementById('modal-outcome').value        = '';
+  document.getElementById('modal-notes').value          = '';
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+document.getElementById('modal-cancel').addEventListener('click', () => {
+  document.getElementById('modal-overlay').classList.remove('open');
 });
 
-document.getElementById("bus-toggle").addEventListener("change", e => {
-  busOnly = e.target.checked;
-  applyFilters();
+document.getElementById('modal-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal-overlay'))
+    document.getElementById('modal-overlay').classList.remove('open');
 });
 
+document.getElementById('modal-submit').addEventListener('click', async () => {
+  const id       = document.getElementById('modal-installer-id').value;
+  const employee = document.getElementById('modal-employee').value.trim();
+  const outcome  = document.getElementById('modal-outcome').value;
+  const notes    = document.getElementById('modal-notes').value.trim();
+  const name     = document.getElementById('modal-installer-name').textContent;
+
+  if (!employee) { alert('Please enter your name.'); return; }
+  if (!outcome)  { alert('Please select an outcome.'); return; }
+
+  const btn = document.getElementById('modal-submit');
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  const { data, error } = await db.from('contacts').insert([{
+    installer_id: id, installer_name: name, employee, outcome, notes,
+  }]).select();
+
+  btn.disabled = false; btn.textContent = 'Save Contact';
+
+  if (error) { alert('Failed to save: ' + error.message); return; }
+
+  if (!contactMap[id]) contactMap[id] = [];
+  contactMap[id].unshift(data[0]);
+
+  const marker = allMarkers.find(m => m._d.id === id);
+  if (marker) {
+    applyMarkerStyle(marker);
+    if (marker.isPopupOpen()) marker.setPopupContent(buildPopup(marker._d));
+  }
+
+  updateContactStats();
+  applyFilters();
+  document.getElementById('modal-overlay').classList.remove('open');
+});
+
+// Open popup on marker click (rebuild each time so contact history is fresh)
+// Delegated via cluster
+cluster.on('click', e => { openPopup(e.layer); });
+
+/* ── Event listeners ─────────────────────────────────────── */
+document.getElementById("search").addEventListener("input", e => { searchTerm = e.target.value; applyFilters(); });
+document.getElementById("bus-toggle").addEventListener("change", e => { busOnly = e.target.checked; applyFilters(); });
+document.getElementById("status-filter").addEventListener("change", e => { statusFilter = e.target.value; applyFilters(); });
 document.getElementById("radius-toggle").addEventListener("change", e => {
   e.target.checked ? radiusCircle.addTo(map) : radiusCircle.remove();
 });
 
 document.getElementById("reset").addEventListener("click", () => {
-  activeTechs = new Set(TECH_ORDER);
-  busOnly = false;
-  searchTerm = "";
-  document.getElementById("search").value = "";
-  document.getElementById("bus-toggle").checked = false;
+  activeTechs  = new Set(TECH_ORDER);
+  busOnly      = false;
+  searchTerm   = "";
+  statusFilter = "all";
+  document.getElementById("search").value         = "";
+  document.getElementById("bus-toggle").checked   = false;
+  document.getElementById("status-filter").value  = "all";
   document.querySelectorAll("#tech-list input").forEach(cb => cb.checked = true);
   cluster.clearLayers();
   allMarkers.forEach(m => cluster.addLayer(m));
   updateCount();
 });
 
-/* ── Fetch data ──────────────────────────────────────────────── */
+/* ── Bootstrap ───────────────────────────────────────────── */
 fetch("installers.json")
   .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
-  .then(initMap)
+  .then(async data => {
+    document.getElementById("loading").style.display = "none";
+    initMap(data);
+    await loadContacts();
+    applyFilters();
+  })
   .catch(() => {
     document.getElementById("loading").innerHTML =
       "<p style='color:#e74c3c'>Failed to load installer data.<br>Please try refreshing.</p>";
   });
+
 </script>
 </body>
 </html>
