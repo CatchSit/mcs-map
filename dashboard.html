@@ -168,6 +168,33 @@
     @media (max-width: 420px) {
       .cards { grid-template-columns: 1fr 1fr; }
     }
+
+    /* ── Charts ──────────────────────────────────────────────── */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .chart-card {
+      background: #fff; border-radius: 10px;
+      padding: 18px 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    }
+    .chart-card h3 {
+      font-size: 11px; font-weight: bold;
+      text-transform: uppercase; letter-spacing: .8px;
+      color: #888; margin-bottom: 14px;
+    }
+    .chart-full { grid-column: 1 / -1; }
+    .chart-canvas-sm { max-height: 240px; }
+    .chart-canvas-md { max-height: 220px; }
+    .chart-canvas-lg { max-height: 200px; }
+
+    @media (max-width: 768px) {
+      .charts-grid { grid-template-columns: 1fr; }
+      .chart-canvas-sm { max-height: 220px; }
+    }
   </style>
 </head>
 <body>
@@ -192,6 +219,22 @@
     <div class="card followup"><div class="val" id="c-fol">–</div>  <div class="lbl">Follow Up</div></div>
     <div class="card convert"> <div class="val" id="c-con">–</div>  <div class="lbl">Converted</div></div>
     <div class="card notint">  <div class="val" id="c-not">–</div>  <div class="lbl">Not Interested</div></div>
+  </div>
+
+  <!-- Charts -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <h3>Pipeline Overview</h3>
+      <canvas id="chart-pipeline" class="chart-canvas-sm"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>Daily Contact Activity — Last 30 Days</h3>
+      <canvas id="chart-activity" class="chart-canvas-md"></canvas>
+    </div>
+    <div class="chart-card chart-full">
+      <h3>Activity by Employee</h3>
+      <canvas id="chart-employee" class="chart-canvas-lg"></canvas>
+    </div>
   </div>
 
   <!-- Filters -->
@@ -258,6 +301,7 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
 const { createClient } = supabase;
 const db = createClient(
@@ -283,6 +327,120 @@ let sortCol  = "contacted_at";
 let sortAsc  = false;
 
 /* ── Load all data ─────────────────────────────────────────── */
+/* ── Charts ────────────────────────────────────────────────── */
+const CHART_COLORS = {
+  "Interested":              "#f39c12",
+  "Follow Up":               "#e67e22",
+  "Converted":               "#27ae60",
+  "Existing Customer":       "#7d3c98",
+  "Not Interested":          "#7f8c8d",
+  "No Answer":               "#95a5a6",
+  "Removed from MCS Database": "#922b21",
+};
+
+const activeCharts = {};
+
+function buildCharts() {
+  buildPipelineChart();
+  buildActivityChart();
+  buildEmployeeChart();
+}
+
+function buildPipelineChart() {
+  // Latest contact outcome per unique installer
+  const latest = {};
+  [...allData]
+    .sort((a, b) => new Date(b.contacted_at) - new Date(a.contacted_at))
+    .forEach(c => { if (!latest[c.installer_id]) latest[c.installer_id] = c.outcome; });
+
+  const counts = {};
+  Object.values(latest).forEach(o => { counts[o] = (counts[o] || 0) + 1; });
+
+  const labels = Object.keys(counts);
+  const values = Object.values(counts);
+  const colors = labels.map(l => CHART_COLORS[l] || '#ccc');
+
+  if (activeCharts.pipeline) activeCharts.pipeline.destroy();
+  activeCharts.pipeline = new Chart(document.getElementById('chart-pipeline'), {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data: values, backgroundColor: colors, borderWidth: 2, borderColor: '#fff' }] },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 10, boxWidth: 12 } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed}` } },
+      }
+    }
+  });
+}
+
+function buildActivityChart() {
+  const dateLabels = [], dateCounts = {}, dateKeys = [];
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    dateKeys.push(key);
+    dateLabels.push(d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }));
+    dateCounts[key] = 0;
+  }
+  allData.forEach(c => {
+    const key = c.contacted_at.slice(0, 10);
+    if (key in dateCounts) dateCounts[key]++;
+  });
+
+  if (activeCharts.activity) activeCharts.activity.destroy();
+  activeCharts.activity = new Chart(document.getElementById('chart-activity'), {
+    type: 'bar',
+    data: {
+      labels: dateLabels,
+      datasets: [{
+        label: 'Contacts logged',
+        data: dateKeys.map(k => dateCounts[k]),
+        backgroundColor: '#1a5276',
+        borderRadius: 3,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 }, grid: { color: '#f0f0f0' } },
+        x: { ticks: { maxRotation: 45, font: { size: 10 } }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+function buildEmployeeChart() {
+  const counts = {};
+  allData.forEach(c => { counts[c.employee] = (counts[c.employee] || 0) + 1; });
+  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+
+  if (activeCharts.employee) activeCharts.employee.destroy();
+  activeCharts.employee = new Chart(document.getElementById('chart-employee'), {
+    type: 'bar',
+    data: {
+      labels: sorted.map(e => e[0]),
+      datasets: [{
+        label: 'Contacts logged',
+        data: sorted.map(e => e[1]),
+        backgroundColor: sorted.map((_, i) => `hsl(${210 + i * 25}, 55%, ${42 + i * 4}%)`),
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 }, grid: { color: '#f0f0f0' } },
+        y: { grid: { display: false }, ticks: { font: { size: 12 } } }
+      }
+    }
+  });
+}
+
 async function loadData() {
   const { data, error } = await db
     .from('contacts')
@@ -298,6 +456,7 @@ async function loadData() {
   allData = data;
   populateEmployeeFilter();
   updateCards();
+  buildCharts();
   applyFilters();
 }
 
