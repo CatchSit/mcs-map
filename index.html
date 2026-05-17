@@ -196,6 +196,7 @@
       <option value="Interested">Interested</option>
       <option value="Follow Up">Follow Up</option>
       <option value="Converted">Converted to Customer</option>
+      <option value="Existing Customer">Existing Customer</option>
       <option value="Not Interested">Not Interested</option>
       <option value="No Answer">No Answer</option>
     </select>
@@ -224,21 +225,23 @@
 
   <div class="section">
     <h3>Map Colour Key</h3>
-    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#fff;border:1.5px solid #888"></span>Not yet contacted</span></div>
+    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#222"></span>Not yet contacted</span></div>
     <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#bdc3c7"></span>No Answer</span></div>
     <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#f39c12"></span>Interested</span></div>
     <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#e67e22"></span>Follow Up</span></div>
     <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#27ae60"></span>Converted</span></div>
+    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#7d3c98"></span>Existing Customer</span></div>
     <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#7f8c8d"></span>Not Interested</span></div>
   </div>
 
   <div class="section">
     <h3>Contact Pipeline</h3>
-    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#bdc3c7"></span>Not contacted</span><span class="stat-n" id="stat-none">–</span></div>
+    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#222"></span>Not contacted</span><span class="stat-n" id="stat-none">–</span></div>
     <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#bdc3c7"></span>No Answer</span><span class="stat-n" id="stat-noanswer">–</span></div>
     <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#f39c12"></span>Interested</span><span class="stat-n" id="stat-interested">–</span></div>
     <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#e67e22"></span>Follow Up</span><span class="stat-n" id="stat-followup">–</span></div>
     <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#27ae60"></span>Converted</span><span class="stat-n" id="stat-converted">–</span></div>
+    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#7d3c98"></span>Existing Customer</span><span class="stat-n" id="stat-existing">–</span></div>
     <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#7f8c8d"></span>Not Interested</span><span class="stat-n" id="stat-notinterested">–</span></div>
   </div>
 
@@ -277,6 +280,7 @@
       <option value="Follow Up">Follow Up</option>
       <option value="Not Interested">Not Interested</option>
       <option value="Converted">Converted to Customer</option>
+      <option value="Existing Customer">Existing Customer</option>
     </select>
 
     <label>Notes <span style="font-weight:normal;color:#aaa;">(optional)</span></label>
@@ -326,11 +330,12 @@ function primaryColor(techs) {
 
 /* ── Contact status config ───────────────────────────────── */
 const STATUS = {
-  "Interested":     { stroke: "#f39c12", weight: 3 },
-  "Follow Up":      { stroke: "#e67e22", weight: 3 },
-  "Converted":      { stroke: "#27ae60", weight: 3.5 },
-  "Not Interested": { stroke: "#7f8c8d", weight: 2.5 },
-  "No Answer":      { stroke: "#bdc3c7", weight: 2.5 },
+  "Interested":        { stroke: "#f39c12", weight: 3 },
+  "Follow Up":         { stroke: "#e67e22", weight: 3 },
+  "Converted":         { stroke: "#27ae60", weight: 3.5 },
+  "Existing Customer": { stroke: "#7d3c98", weight: 3.5 },
+  "Not Interested":    { stroke: "#7f8c8d", weight: 2.5 },
+  "No Answer":         { stroke: "#bdc3c7", weight: 2.5 },
 };
 
 /* ── Map setup ───────────────────────────────────────────── */
@@ -348,7 +353,14 @@ const radiusCircle = L.circle(WAREHOUSE, {
   fillColor: "#1a5276", fillOpacity: 0.06,
 });
 
-const cluster = L.markerClusterGroup({ chunkedLoading: true, maxClusterRadius: 50 });
+const cluster = L.markerClusterGroup({
+  chunkedLoading: true,
+  maxClusterRadius: 50,
+  iconCreateFunction: c => L.divIcon({
+    html: `<div style="background:#2c3e50;color:#fff;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;box-shadow:0 1px 4px rgba(0,0,0,.4)">${c.getChildCount()}</div>`,
+    className: "", iconSize: [36, 36],
+  }),
+});
 map.addLayer(cluster);
 
 /* ── State ───────────────────────────────────────────────── */
@@ -371,7 +383,7 @@ function applyMarkerStyle(marker) {
   if (latest && STATUS[latest.outcome]) {
     marker.setStyle({ fillColor: STATUS[latest.outcome].stroke, color: "#fff", weight: 2, fillOpacity: 0.95 });
   } else {
-    marker.setStyle({ fillColor: "#fff", color: "#888", weight: 1.5, fillOpacity: 1 });
+    marker.setStyle({ fillColor: "#222", color: "#fff", weight: 1.5, fillOpacity: 1 });
   }
 }
 
@@ -423,8 +435,8 @@ function initMap(data) {
   data.forEach(d => {
     if (!d.lat || !d.lng) return;
     const marker = L.circleMarker([d.lat, d.lng], {
-      radius: 7, fillColor: "#fff",
-      color: "#888", weight: 1.5, opacity: 1, fillOpacity: 1,
+      radius: 7, fillColor: "#222",
+      color: "#fff", weight: 1.5, opacity: 1, fillOpacity: 1,
     });
     marker.bindTooltip(d.name, { direction: "top", offset: [0, -5] });
     marker._d = d;
@@ -500,7 +512,8 @@ function updateContactStats() {
   document.getElementById("stat-noanswer").textContent    = (counts["No Answer"]||0).toLocaleString();
   document.getElementById("stat-interested").textContent  = (counts["Interested"]||0).toLocaleString();
   document.getElementById("stat-followup").textContent    = (counts["Follow Up"]||0).toLocaleString();
-  document.getElementById("stat-converted").textContent   = (counts["Converted"]||0).toLocaleString();
+  document.getElementById("stat-converted").textContent    = (counts["Converted"]||0).toLocaleString();
+  document.getElementById("stat-existing").textContent     = (counts["Existing Customer"]||0).toLocaleString();
   document.getElementById("stat-notinterested").textContent = (counts["Not Interested"]||0).toLocaleString();
 }
 
