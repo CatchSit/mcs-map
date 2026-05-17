@@ -199,6 +199,7 @@
       <option value="Existing Customer">Existing Customer</option>
       <option value="Not Interested">Not Interested</option>
       <option value="No Answer">No Answer</option>
+      <option value="Removed from MCS Database">Removed from MCS Database</option>
     </select>
   </div>
 
@@ -232,6 +233,7 @@
     <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#27ae60"></span>Converted</span></div>
     <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#7d3c98"></span>Existing Customer</span></div>
     <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#7f8c8d"></span>Not Interested</span></div>
+    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#922b21"></span>Removed from MCS</span></div>
   </div>
 
   <div class="section">
@@ -243,6 +245,7 @@
     <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#27ae60"></span>Converted</span><span class="stat-n" id="stat-converted">–</span></div>
     <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#7d3c98"></span>Existing Customer</span><span class="stat-n" id="stat-existing">–</span></div>
     <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#7f8c8d"></span>Not Interested</span><span class="stat-n" id="stat-notinterested">–</span></div>
+    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#922b21"></span>Removed from MCS</span><span class="stat-n" id="stat-removed">–</span></div>
   </div>
 
   <button id="reset">Reset Filters</button>
@@ -339,8 +342,9 @@ const STATUS = {
   "Follow Up":         { stroke: "#e67e22", weight: 3 },
   "Converted":         { stroke: "#27ae60", weight: 3.5 },
   "Existing Customer": { stroke: "#7d3c98", weight: 3.5 },
-  "Not Interested":    { stroke: "#7f8c8d", weight: 2.5 },
-  "No Answer":         { stroke: "#bdc3c7", weight: 2.5 },
+  "Not Interested":          { stroke: "#7f8c8d", weight: 2.5 },
+  "No Answer":               { stroke: "#bdc3c7", weight: 2.5 },
+  "Removed from MCS Database": { stroke: "#922b21", weight: 2.5 },
 };
 
 /* ── Map setup ───────────────────────────────────────────── */
@@ -523,6 +527,7 @@ function updateContactStats() {
   document.getElementById("stat-converted").textContent    = (counts["Converted"]||0).toLocaleString();
   document.getElementById("stat-existing").textContent     = (counts["Existing Customer"]||0).toLocaleString();
   document.getElementById("stat-notinterested").textContent = (counts["Not Interested"]||0).toLocaleString();
+  document.getElementById("stat-removed").textContent       = (counts["Removed from MCS Database"]||0).toLocaleString();
 }
 
 /* ── Load contacts from Supabase ─────────────────────────── */
