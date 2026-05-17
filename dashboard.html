@@ -135,6 +135,42 @@
     .page-btn.active { background: #1a5276; color: #fff; border-color: #1a5276; }
     .page-btn:disabled { opacity: .4; cursor: default; }
 
+    /* ── Admin action buttons ────────────────────────────────── */
+    .btn-edit {
+      background: none; border: 1px solid #1a5276; color: #1a5276;
+      padding: 4px 10px; border-radius: 5px; font-size: 11px;
+      cursor: pointer; margin-right: 4px;
+    }
+    .btn-edit:hover { background: #1a5276; color: #fff; }
+    .btn-del {
+      background: none; border: 1px solid #c0392b; color: #c0392b;
+      padding: 4px 10px; border-radius: 5px; font-size: 11px; cursor: pointer;
+    }
+    .btn-del:hover { background: #c0392b; color: #fff; }
+
+    /* ── Edit modal ──────────────────────────────────────────── */
+    #edit-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.5); z-index: 9000;
+      align-items: center; justify-content: center;
+    }
+    #edit-overlay.open { display: flex; }
+    #edit-modal {
+      background: #fff; border-radius: 10px;
+      padding: 26px; width: 440px; max-width: 94vw;
+      box-shadow: 0 20px 60px rgba(0,0,0,.3);
+    }
+    #edit-modal h2 { font-size: 16px; color: #1a5276; margin-bottom: 16px; }
+    #edit-modal label { display: block; font-size: 12px; font-weight: bold; color: #555; margin-bottom: 4px; }
+    #edit-modal input, #edit-modal select, #edit-modal textarea {
+      width: 100%; padding: 8px 10px; border: 1px solid #ddd;
+      border-radius: 6px; font-size: 13px; margin-bottom: 14px;
+      font-family: Arial, sans-serif; outline: none;
+    }
+    #edit-modal input:focus, #edit-modal select:focus, #edit-modal textarea:focus { border-color: #1a5276; }
+    #edit-modal textarea { height: 75px; resize: vertical; }
+    .edit-btns { display: flex; gap: 10px; justify-content: flex-end; }
+
     /* ── Mobile responsive ───────────────────────────────────── */
     @media (max-width: 768px) {
       header {
@@ -290,6 +326,7 @@
           <th data-col="employee">Employee</th>
           <th data-col="outcome">Outcome</th>
           <th>Notes</th>
+          <th id="actions-header" style="display:none"></th>
         </tr>
       </thead>
       <tbody id="tbody">
@@ -299,6 +336,34 @@
     <div class="pagination" id="pagination"></div>
   </div>
 </main>
+
+<!-- Edit modal (admin only) -->
+<div id="edit-overlay">
+  <div id="edit-modal">
+    <h2>Edit Contact Log</h2>
+    <input type="hidden" id="edit-id"/>
+    <label>Employee</label>
+    <input type="text" id="edit-employee"/>
+    <label>Outcome</label>
+    <select id="edit-outcome">
+      <option value="No Answer">No Answer</option>
+      <option value="Interested">Interested</option>
+      <option value="Follow Up">Follow Up</option>
+      <option value="Not Interested">Not Interested</option>
+      <option value="Converted">Converted</option>
+      <option value="Existing Customer">Existing Customer</option>
+      <option value="Removed from MCS Database">Removed from MCS Database</option>
+    </select>
+    <label>Follow-up Date <span style="font-weight:normal;color:#aaa">(optional)</span></label>
+    <input type="date" id="edit-followup"/>
+    <label>Notes <span style="font-weight:normal;color:#aaa">(optional)</span></label>
+    <textarea id="edit-notes"></textarea>
+    <div class="edit-btns">
+      <button class="btn-secondary" id="edit-cancel">Cancel</button>
+      <button class="btn-primary" id="edit-save">Save Changes</button>
+    </div>
+  </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
@@ -320,6 +385,7 @@ const OUTCOME_COLORS = {
 };
 
 const PAGE_SIZE = 50;
+const IS_ADMIN  = new URLSearchParams(location.search).has('admin');
 let allData  = [];
 let filtered = [];
 let page     = 1;
@@ -327,6 +393,51 @@ let sortCol  = "contacted_at";
 let sortAsc  = false;
 
 /* ── Load all data ─────────────────────────────────────────── */
+/* ── Admin: edit & delete ──────────────────────────────────── */
+function openEdit(id) {
+  const r = allData.find(x => x.id === id);
+  if (!r) return;
+  document.getElementById('edit-id').value        = r.id;
+  document.getElementById('edit-employee').value  = r.employee || '';
+  document.getElementById('edit-outcome').value   = r.outcome  || '';
+  document.getElementById('edit-followup').value  = r.follow_up_date || '';
+  document.getElementById('edit-notes').value     = r.notes    || '';
+  document.getElementById('edit-overlay').classList.add('open');
+}
+
+document.getElementById('edit-cancel').addEventListener('click', () => {
+  document.getElementById('edit-overlay').classList.remove('open');
+});
+document.getElementById('edit-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('edit-overlay'))
+    document.getElementById('edit-overlay').classList.remove('open');
+});
+
+document.getElementById('edit-save').addEventListener('click', async () => {
+  const id  = document.getElementById('edit-id').value;
+  const btn = document.getElementById('edit-save');
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  const { error } = await db.from('contacts').update({
+    employee:        document.getElementById('edit-employee').value.trim(),
+    outcome:         document.getElementById('edit-outcome').value,
+    follow_up_date:  document.getElementById('edit-followup').value || null,
+    notes:           document.getElementById('edit-notes').value.trim(),
+  }).eq('id', id);
+
+  btn.disabled = false; btn.textContent = 'Save Changes';
+  if (error) { alert('Failed to save: ' + error.message); return; }
+  document.getElementById('edit-overlay').classList.remove('open');
+  await loadData();
+});
+
+async function deleteContact(id) {
+  if (!confirm('Permanently delete this contact log? This cannot be undone.')) return;
+  const { error } = await db.from('contacts').delete().eq('id', id);
+  if (error) { alert('Failed to delete: ' + error.message); return; }
+  await loadData();
+}
+
 /* ── Charts ────────────────────────────────────────────────── */
 const CHART_COLORS = {
   "Interested":              "#f39c12",
@@ -525,9 +636,12 @@ function render() {
   document.getElementById('result-count').textContent =
     `${filtered.length.toLocaleString()} result${filtered.length !== 1 ? 's' : ''}`;
 
+  const colspan = IS_ADMIN ? 6 : 5;
+  document.getElementById('actions-header').style.display = IS_ADMIN ? '' : 'none';
+
   const tbody = document.getElementById('tbody');
   if (!rows.length) {
-    tbody.innerHTML = '<tr class="state-row"><td colspan="5">No contacts match the current filters.</td></tr>';
+    tbody.innerHTML = `<tr class="state-row"><td colspan="${colspan}">No contacts match the current filters.</td></tr>`;
     document.getElementById('pagination').innerHTML = '';
     return;
   }
@@ -538,12 +652,19 @@ function render() {
     const timeStr = dt.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
     const color   = OUTCOME_COLORS[r.outcome] || '#aaa';
     const notes   = r.notes ? `<span class="td-notes">${escHtml(r.notes)}</span>` : '<span style="color:#ccc">—</span>';
+    const actions = IS_ADMIN
+      ? `<td style="white-space:nowrap">
+           <button class="btn-edit" onclick="openEdit('${r.id}')">Edit</button>
+           <button class="btn-del"  onclick="deleteContact('${r.id}')">Delete</button>
+         </td>`
+      : '';
     return `<tr>
       <td style="white-space:nowrap">${dateStr}<br><span style="color:#aaa;font-size:11px">${timeStr}</span></td>
       <td class="td-name">${escHtml(r.installer_name || '—')}</td>
       <td>${escHtml(r.employee)}</td>
       <td><span class="outcome-pill" style="background:${color}">${escHtml(r.outcome)}</span></td>
       <td>${notes}</td>
+      ${actions}
     </tr>`;
   }).join('');
 
