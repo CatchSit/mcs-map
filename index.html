@@ -176,6 +176,7 @@
   <div id="sidebar-header">
     <h1>MCS Installer Map</h1>
     <p>Updated daily from mcscertified.com</p>
+    <a href="dashboard.html" style="display:inline-block;margin-top:10px;padding:6px 14px;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:6px;font-size:12px;text-decoration:none;">📊 Manager Dashboard</a>
   </div>
 
   <div id="count-bar">
@@ -219,6 +220,16 @@
       <div class="switch"><input type="checkbox" id="radius-toggle"/><span class="slider"></span></div>
       Show 50-mile free delivery radius
     </label>
+  </div>
+
+  <div class="section">
+    <h3>Map Colour Key</h3>
+    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#fff;border:1.5px solid #888"></span>Not yet contacted</span></div>
+    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#bdc3c7"></span>No Answer</span></div>
+    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#f39c12"></span>Interested</span></div>
+    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#e67e22"></span>Follow Up</span></div>
+    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#27ae60"></span>Converted</span></div>
+    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#7f8c8d"></span>Not Interested</span></div>
   </div>
 
   <div class="section">
@@ -357,11 +368,10 @@ function latestContact(id) {
 
 function applyMarkerStyle(marker) {
   const latest = latestContact(marker._d.id);
-  const fill   = primaryColor(marker._d.techs);
   if (latest && STATUS[latest.outcome]) {
-    marker.setStyle({ fillColor: fill, color: STATUS[latest.outcome].stroke, weight: STATUS[latest.outcome].weight, fillOpacity: 0.9 });
+    marker.setStyle({ fillColor: STATUS[latest.outcome].stroke, color: "#fff", weight: 2, fillOpacity: 0.95 });
   } else {
-    marker.setStyle({ fillColor: fill, color: "#fff", weight: 1.5, fillOpacity: 0.85 });
+    marker.setStyle({ fillColor: "#fff", color: "#888", weight: 1.5, fillOpacity: 1 });
   }
 }
 
@@ -413,8 +423,8 @@ function initMap(data) {
   data.forEach(d => {
     if (!d.lat || !d.lng) return;
     const marker = L.circleMarker([d.lat, d.lng], {
-      radius: 7, fillColor: primaryColor(d.techs),
-      color: "#fff", weight: 1.5, opacity: 1, fillOpacity: 0.85,
+      radius: 7, fillColor: "#fff",
+      color: "#888", weight: 1.5, opacity: 1, fillOpacity: 1,
     });
     marker.bindTooltip(d.name, { direction: "top", offset: [0, -5] });
     marker._d = d;
