@@ -234,10 +234,11 @@ function primaryColor(techs) {
 
 /* ── Map setup ───────────────────────────────────────────────── */
 const map = L.map("map", { center: [54.5, -3.5], zoom: 6 });
-L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-  attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a> contributors',
   maxZoom: 19,
 }).addTo(map);
+document.querySelector('.leaflet-tile-pane').style.filter = 'saturate(0.35) brightness(1.05)';
 
 // Delivery radius — DN2 4NH (Doncaster warehouse), 50 miles
 const WAREHOUSE = [53.5246, -1.0826];
