@@ -178,6 +178,17 @@
     </label>
   </div>
 
+  <div class="section">
+    <h3>Delivery Area</h3>
+    <label class="toggle-row">
+      <div class="switch">
+        <input type="checkbox" id="radius-toggle"/>
+        <span class="slider"></span>
+      </div>
+      Show 50-mile free delivery radius
+    </label>
+  </div>
+
   <button id="reset">Reset Filters</button>
 
   <div id="footer">
@@ -223,10 +234,22 @@ function primaryColor(techs) {
 
 /* ── Map setup ───────────────────────────────────────────────── */
 const map = L.map("map", { center: [54.5, -3.5], zoom: 6 });
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a>',
-  maxZoom: 18,
+L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+  attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
+  maxZoom: 19,
 }).addTo(map);
+
+// Delivery radius — DN2 4NH (Doncaster warehouse), 50 miles
+const WAREHOUSE = [53.5246, -1.0826];
+const RADIUS_M  = 50 * 1609.344;
+const radiusCircle = L.circle(WAREHOUSE, {
+  radius:      RADIUS_M,
+  color:       "#1a5276",
+  weight:      2,
+  dashArray:   "8 6",
+  fillColor:   "#1a5276",
+  fillOpacity: 0.06,
+});
 
 const cluster = L.markerClusterGroup({ chunkedLoading: true, maxClusterRadius: 50 });
 map.addLayer(cluster);
@@ -334,6 +357,10 @@ document.getElementById("search").addEventListener("input", e => {
 document.getElementById("bus-toggle").addEventListener("change", e => {
   busOnly = e.target.checked;
   applyFilters();
+});
+
+document.getElementById("radius-toggle").addEventListener("change", e => {
+  e.target.checked ? radiusCircle.addTo(map) : radiusCircle.remove();
 });
 
 document.getElementById("reset").addEventListener("click", () => {
