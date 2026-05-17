@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MCS CRM Dashboard</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f0f4f8; color: #333; min-height: 100vh; }
+
+    /* ── Header ─────────────────────────────── */
+    header {
+      background: #1a5276; color: #fff;
+      padding: 16px 28px; display: flex;
+      align-items: center; justify-content: space-between;
+    }
+    header h1 { font-size: 18px; }
+    header p  { font-size: 12px; color: #acd4f5; margin-top: 2px; }
+    .header-right { display: flex; gap: 12px; align-items: center; }
+    .nav-btn {
+      background: rgba(255,255,255,.15); color: #fff;
+      border: 1px solid rgba(255,255,255,.3);
+      padding: 7px 16px; border-radius: 6px;
+      font-size: 13px; cursor: pointer; text-decoration: none;
+      display: inline-block;
+    }
+    .nav-btn:hover { background: rgba(255,255,255,.25); }
+    .export-btn {
+      background: #27ae60; color: #fff; border: none;
+      padding: 7px 16px; border-radius: 6px;
+      font-size: 13px; cursor: pointer;
+    }
+    .export-btn:hover { background: #219a52; }
+
+    /* ── Main layout ─────────────────────────── */
+    main { max-width: 1200px; margin: 0 auto; padding: 24px 20px; }
+
+    /* ── Summary cards ───────────────────────── */
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .card {
+      background: #fff; border-radius: 10px;
+      padding: 18px 20px; box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      border-left: 4px solid #ccc;
+    }
+    .card .val { font-size: 32px; font-weight: bold; color: #1a5276; line-height: 1.1; }
+    .card .lbl { font-size: 12px; color: #888; margin-top: 4px; }
+    .card.today    { border-color: #1a5276; }
+    .card.week     { border-color: #2980b9; }
+    .card.interest { border-color: #f39c12; }
+    .card.followup { border-color: #e67e22; }
+    .card.convert  { border-color: #27ae60; }
+    .card.notint   { border-color: #7f8c8d; }
+
+    /* ── Filters ─────────────────────────────── */
+    .filters {
+      background: #fff; border-radius: 10px;
+      padding: 16px 20px; margin-bottom: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end;
+    }
+    .filter-group { display: flex; flex-direction: column; gap: 4px; }
+    .filter-group label { font-size: 11px; font-weight: bold; color: #555; text-transform: uppercase; letter-spacing: .5px; }
+    .filter-group input,
+    .filter-group select {
+      padding: 7px 10px; border: 1px solid #ddd;
+      border-radius: 6px; font-size: 13px;
+      outline: none; min-width: 140px;
+    }
+    .filter-group input:focus,
+    .filter-group select:focus { border-color: #1a5276; }
+    .filter-actions { display: flex; gap: 8px; margin-left: auto; align-items: flex-end; }
+    .btn-apply {
+      background: #1a5276; color: #fff; border: none;
+      padding: 8px 18px; border-radius: 6px; font-size: 13px; cursor: pointer;
+    }
+    .btn-apply:hover { background: #2472a4; }
+    .btn-clear {
+      background: #eee; color: #555; border: none;
+      padding: 8px 14px; border-radius: 6px; font-size: 13px; cursor: pointer;
+    }
+    .btn-clear:hover { background: #ddd; }
+
+    /* ── Table ───────────────────────────────── */
+    .table-wrap {
+      background: #fff; border-radius: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08); overflow: hidden;
+    }
+    .table-header {
+      padding: 14px 20px; border-bottom: 1px solid #eee;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .table-header h2 { font-size: 14px; color: #333; }
+    .table-header span { font-size: 12px; color: #888; }
+
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      background: #f7f9fc; padding: 11px 16px;
+      text-align: left; font-size: 11px; font-weight: bold;
+      text-transform: uppercase; letter-spacing: .5px;
+      color: #666; border-bottom: 2px solid #eee;
+      cursor: pointer; user-select: none; white-space: nowrap;
+    }
+    thead th:hover { background: #edf1f7; }
+    thead th.sorted { color: #1a5276; }
+    tbody tr { border-bottom: 1px solid #f0f0f0; transition: background .1s; }
+    tbody tr:hover { background: #f8fbff; }
+    tbody td { padding: 11px 16px; font-size: 13px; vertical-align: top; }
+    .td-name { font-weight: bold; color: #1a5276; }
+    .td-notes { color: #666; font-size: 12px; max-width: 220px; }
+
+    /* Outcome pill */
+    .outcome-pill {
+      display: inline-block; font-size: 11px; font-weight: bold;
+      padding: 3px 9px; border-radius: 10px; color: #fff; white-space: nowrap;
+    }
+
+    /* Empty / loading states */
+    .state-row td {
+      text-align: center; padding: 40px;
+      color: #aaa; font-size: 14px;
+    }
+
+    /* ── Pagination ──────────────────────────── */
+    .pagination {
+      display: flex; align-items: center; justify-content: center;
+      gap: 8px; padding: 16px;
+      border-top: 1px solid #eee;
+    }
+    .page-btn {
+      padding: 6px 12px; border: 1px solid #ddd;
+      border-radius: 6px; background: #fff;
+      font-size: 13px; cursor: pointer; color: #333;
+    }
+    .page-btn:hover { background: #f0f0f0; }
+    .page-btn.active { background: #1a5276; color: #fff; border-color: #1a5276; }
+    .page-btn:disabled { opacity: .4; cursor: default; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>CRM Dashboard</h1>
+    <p>MCS Installer Contact Log</p>
+  </div>
+  <div class="header-right">
+    <a href="index.html" class="nav-btn">← Back to Map</a>
+    <button class="export-btn" id="export-btn">Export CSV</button>
+  </div>
+</header>
+
+<main>
+  <!-- Summary cards -->
+  <div class="cards">
+    <div class="card today">  <div class="val" id="c-today">–</div><div class="lbl">Contacts Today</div></div>
+    <div class="card week">   <div class="val" id="c-week">–</div> <div class="lbl">This Week</div></div>
+    <div class="card interest"><div class="val" id="c-int">–</div>  <div class="lbl">Interested</div></div>
+    <div class="card followup"><div class="val" id="c-fol">–</div>  <div class="lbl">Follow Up</div></div>
+    <div class="card convert"> <div class="val" id="c-con">–</div>  <div class="lbl">Converted</div></div>
+    <div class="card notint">  <div class="val" id="c-not">–</div>  <div class="lbl">Not Interested</div></div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters">
+    <div class="filter-group">
+      <label>Date From</label>
+      <input type="date" id="f-from"/>
+    </div>
+    <div class="filter-group">
+      <label>Date To</label>
+      <input type="date" id="f-to"/>
+    </div>
+    <div class="filter-group">
+      <label>Employee</label>
+      <select id="f-employee">
+        <option value="">All employees</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Outcome</label>
+      <select id="f-outcome">
+        <option value="">All outcomes</option>
+        <option>No Answer</option>
+        <option>Interested</option>
+        <option>Follow Up</option>
+        <option>Not Interested</option>
+        <option>Converted</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Search installer</label>
+      <input type="text" id="f-search" placeholder="Name…"/>
+    </div>
+    <div class="filter-actions">
+      <button class="btn-clear" id="btn-clear">Clear</button>
+      <button class="btn-apply" id="btn-apply">Apply</button>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-wrap">
+    <div class="table-header">
+      <h2>Contact Log</h2>
+      <span id="result-count">–</span>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th data-col="contacted_at">Date &amp; Time ↕</th>
+          <th data-col="installer_name">Installer</th>
+          <th data-col="employee">Employee</th>
+          <th data-col="outcome">Outcome</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr class="state-row"><td colspan="5">Loading…</td></tr>
+      </tbody>
+    </table>
+    <div class="pagination" id="pagination"></div>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+const { createClient } = supabase;
+const db = createClient(
+  'https://teezsldwkpwzgvfizial.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRlZXpzbGR3a3B3emd2Zml6aWFsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5NzUxMjAsImV4cCI6MjA5NDU1MTEyMH0.8rRoiHuS98HZp4jHSYbL31J3O9fn36tKEy9ooosPoGU'
+);
+
+const OUTCOME_COLORS = {
+  "Interested":     "#f39c12",
+  "Follow Up":      "#e67e22",
+  "Converted":      "#27ae60",
+  "Not Interested": "#7f8c8d",
+  "No Answer":      "#95a5a6",
+};
+
+const PAGE_SIZE = 50;
+let allData  = [];
+let filtered = [];
+let page     = 1;
+let sortCol  = "contacted_at";
+let sortAsc  = false;
+
+/* ── Load all data ─────────────────────────────────────────── */
+async function loadData() {
+  const { data, error } = await db
+    .from('contacts')
+    .select('*')
+    .order('contacted_at', { ascending: false });
+
+  if (error) {
+    document.getElementById('tbody').innerHTML =
+      '<tr class="state-row"><td colspan="5">Failed to load data. Check your connection.</td></tr>';
+    return;
+  }
+
+  allData = data;
+  populateEmployeeFilter();
+  updateCards();
+  applyFilters();
+}
+
+/* ── Summary cards ─────────────────────────────────────────── */
+function updateCards() {
+  const now   = new Date();
+  const today = now.toISOString().slice(0, 10);
+  const weekAgo = new Date(now - 7 * 864e5).toISOString();
+
+  document.getElementById('c-today').textContent = allData.filter(r => r.contacted_at.startsWith(today)).length;
+  document.getElementById('c-week').textContent  = allData.filter(r => r.contacted_at >= weekAgo).length;
+  document.getElementById('c-int').textContent   = allData.filter(r => r.outcome === 'Interested').length;
+  document.getElementById('c-fol').textContent   = allData.filter(r => r.outcome === 'Follow Up').length;
+  document.getElementById('c-con').textContent   = allData.filter(r => r.outcome === 'Converted').length;
+  document.getElementById('c-not').textContent   = allData.filter(r => r.outcome === 'Not Interested').length;
+}
+
+/* ── Employee dropdown ─────────────────────────────────────── */
+function populateEmployeeFilter() {
+  const employees = [...new Set(allData.map(r => r.employee))].sort();
+  const sel = document.getElementById('f-employee');
+  employees.forEach(e => {
+    const opt = document.createElement('option');
+    opt.value = e; opt.textContent = e;
+    sel.appendChild(opt);
+  });
+}
+
+/* ── Filter + sort ─────────────────────────────────────────── */
+function applyFilters() {
+  const from     = document.getElementById('f-from').value;
+  const to       = document.getElementById('f-to').value;
+  const employee = document.getElementById('f-employee').value;
+  const outcome  = document.getElementById('f-outcome').value;
+  const search   = document.getElementById('f-search').value.toLowerCase();
+
+  filtered = allData.filter(r => {
+    const date = r.contacted_at.slice(0, 10);
+    if (from && date < from) return false;
+    if (to   && date > to)   return false;
+    if (employee && r.employee !== employee) return false;
+    if (outcome  && r.outcome  !== outcome)  return false;
+    if (search   && !(r.installer_name || '').toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  sortData();
+}
+
+function sortData() {
+  filtered.sort((a, b) => {
+    let av = a[sortCol] || '', bv = b[sortCol] || '';
+    if (av < bv) return sortAsc ? -1 : 1;
+    if (av > bv) return sortAsc ?  1 : -1;
+    return 0;
+  });
+  page = 1;
+  render();
+}
+
+/* ── Render table ──────────────────────────────────────────── */
+function render() {
+  const start = (page - 1) * PAGE_SIZE;
+  const rows  = filtered.slice(start, start + PAGE_SIZE);
+
+  document.getElementById('result-count').textContent =
+    `${filtered.length.toLocaleString()} result${filtered.length !== 1 ? 's' : ''}`;
+
+  const tbody = document.getElementById('tbody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr class="state-row"><td colspan="5">No contacts match the current filters.</td></tr>';
+    document.getElementById('pagination').innerHTML = '';
+    return;
+  }
+
+  tbody.innerHTML = rows.map(r => {
+    const dt      = new Date(r.contacted_at);
+    const dateStr = dt.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+    const timeStr = dt.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+    const color   = OUTCOME_COLORS[r.outcome] || '#aaa';
+    const notes   = r.notes ? `<span class="td-notes">${escHtml(r.notes)}</span>` : '<span style="color:#ccc">—</span>';
+    return `<tr>
+      <td style="white-space:nowrap">${dateStr}<br><span style="color:#aaa;font-size:11px">${timeStr}</span></td>
+      <td class="td-name">${escHtml(r.installer_name || '—')}</td>
+      <td>${escHtml(r.employee)}</td>
+      <td><span class="outcome-pill" style="background:${color}">${escHtml(r.outcome)}</span></td>
+      <td>${notes}</td>
+    </tr>`;
+  }).join('');
+
+  renderPagination();
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ── Pagination ────────────────────────────────────────────── */
+function renderPagination() {
+  const total = Math.ceil(filtered.length / PAGE_SIZE);
+  if (total <= 1) { document.getElementById('pagination').innerHTML = ''; return; }
+
+  let html = `<button class="page-btn" ${page===1?'disabled':''} id="pg-prev">← Prev</button>`;
+  const start = Math.max(1, page - 2), end = Math.min(total, page + 2);
+  if (start > 1) html += `<button class="page-btn" data-p="1">1</button>${start>2?'<span>…</span>':''}`;
+  for (let i = start; i <= end; i++)
+    html += `<button class="page-btn ${i===page?'active':''}" data-p="${i}">${i}</button>`;
+  if (end < total) html += `${end<total-1?'<span>…</span>':''}<button class="page-btn" data-p="${total}">${total}</button>`;
+  html += `<button class="page-btn" ${page===total?'disabled':''} id="pg-next">Next →</button>`;
+
+  const el = document.getElementById('pagination');
+  el.innerHTML = html;
+  el.querySelectorAll('[data-p]').forEach(b => b.addEventListener('click', () => { page = +b.dataset.p; render(); }));
+  el.querySelector('#pg-prev')?.addEventListener('click', () => { if (page>1){ page--; render(); } });
+  el.querySelector('#pg-next')?.addEventListener('click', () => { if (page<total){ page++; render(); } });
+}
+
+/* ── Sort on column click ──────────────────────────────────── */
+document.querySelectorAll('thead th[data-col]').forEach(th => {
+  th.addEventListener('click', () => {
+    const col = th.dataset.col;
+    if (sortCol === col) sortAsc = !sortAsc;
+    else { sortCol = col; sortAsc = false; }
+    document.querySelectorAll('thead th').forEach(t => t.classList.remove('sorted'));
+    th.classList.add('sorted');
+    th.textContent = th.textContent.replace(/[↕↑↓]/,'') + (sortAsc ? ' ↑' : ' ↓');
+    sortData();
+  });
+});
+
+/* ── Export CSV ────────────────────────────────────────────── */
+document.getElementById('export-btn').addEventListener('click', () => {
+  const cols = ['contacted_at','installer_name','employee','outcome','notes'];
+  const header = ['Date','Installer','Employee','Outcome','Notes'];
+  const rows   = filtered.map(r => cols.map(c => `"${(r[c]||'').toString().replace(/"/g,'""')}"`).join(','));
+  const csv    = [header.join(','), ...rows].join('\n');
+  const blob   = new Blob([csv], { type: 'text/csv' });
+  const url    = URL.createObjectURL(blob);
+  const a      = Object.assign(document.createElement('a'), { href: url, download: `mcs-contacts-${new Date().toISOString().slice(0,10)}.csv` });
+  a.click(); URL.revokeObjectURL(url);
+});
+
+/* ── Filter controls ───────────────────────────────────────── */
+document.getElementById('btn-apply').addEventListener('click', () => { page = 1; applyFilters(); });
+document.getElementById('btn-clear').addEventListener('click', () => {
+  ['f-from','f-to','f-search'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-employee').value = '';
+  document.getElementById('f-outcome').value  = '';
+  page = 1; applyFilters();
+});
+document.getElementById('f-search').addEventListener('keydown', e => { if (e.key === 'Enter') applyFilters(); });
+
+/* ── Default date range: last 30 days ──────────────────────── */
+const today   = new Date().toISOString().slice(0,10);
+const month   = new Date(Date.now() - 30*864e5).toISOString().slice(0,10);
+document.getElementById('f-to').value   = today;
+document.getElementById('f-from').value = month;
+
+loadData();
+</script>
+</body>
+</html>
