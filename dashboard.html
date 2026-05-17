@@ -134,6 +134,40 @@
     .page-btn:hover { background: #f0f0f0; }
     .page-btn.active { background: #1a5276; color: #fff; border-color: #1a5276; }
     .page-btn:disabled { opacity: .4; cursor: default; }
+
+    /* ── Mobile responsive ───────────────────────────────────── */
+    @media (max-width: 768px) {
+      header {
+        flex-direction: column; align-items: flex-start; gap: 10px;
+        padding: 14px 16px;
+      }
+      .header-right { width: 100%; justify-content: space-between; }
+      header h1 { font-size: 16px; }
+
+      main { padding: 14px 12px; }
+
+      .cards { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+      .card .val { font-size: 26px; }
+
+      .filters { gap: 10px; }
+      .filter-group { width: 100%; }
+      .filter-group input,
+      .filter-group select { min-width: unset; width: 100%; }
+      .filter-actions { width: 100%; margin-left: 0; }
+      .btn-apply, .btn-clear { flex: 1; }
+
+      .table-header { flex-direction: column; align-items: flex-start; gap: 4px; }
+
+      /* Horizontal scroll for table on small screens */
+      .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      table { min-width: 520px; }
+
+      .pagination { flex-wrap: wrap; gap: 6px; }
+    }
+
+    @media (max-width: 420px) {
+      .cards { grid-template-columns: 1fr 1fr; }
+    }
   </style>
 </head>
 <body>
