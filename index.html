@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MCS Installer Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body { display: flex; height: 100vh; font-family: Arial, sans-serif; overflow: hidden; }
+
+    /* ── Sidebar ────────────────────────────────────────────── */
+    #sidebar {
+      width: 300px; min-width: 300px;
+      background: #0f1d2b;
+      color: #cde;
+      display: flex; flex-direction: column;
+      overflow-y: auto; z-index: 1000;
+    }
+
+    #sidebar-header {
+      background: #1a5276;
+      padding: 18px 16px;
+      flex-shrink: 0;
+    }
+    #sidebar-header h1 { font-size: 17px; color: #fff; }
+    #sidebar-header p  { font-size: 11px; color: #acd4f5; margin-top: 3px; }
+
+    #count-bar {
+      background: #0d1822;
+      padding: 10px 16px;
+      font-size: 13px; color: #7aaccc;
+      border-bottom: 1px solid #1e3045;
+      flex-shrink: 0;
+    }
+    #count-bar strong { color: #fff; font-size: 18px; }
+
+    .section {
+      padding: 14px 16px;
+      border-bottom: 1px solid #1e3045;
+    }
+    .section h3 {
+      font-size: 10px; text-transform: uppercase;
+      letter-spacing: 1.2px; color: #4a7a9b;
+      margin-bottom: 10px;
+    }
+
+    #search {
+      width: 100%; padding: 8px 10px;
+      border-radius: 6px; border: 1px solid #1e3045;
+      background: #07111c; color: #fff; font-size: 13px;
+      outline: none;
+    }
+    #search::placeholder { color: #3a6080; }
+    #search:focus { border-color: #1a5276; }
+
+    .tech-row {
+      display: flex; align-items: center;
+      padding: 5px 0; cursor: pointer;
+      font-size: 13px; color: #9bbdd0;
+      user-select: none;
+    }
+    .tech-row:hover { color: #fff; }
+    .tech-row input { margin-right: 8px; cursor: pointer; accent-color: #1a5276; }
+    .dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      margin-right: 8px; flex-shrink: 0;
+    }
+    .tech-n { margin-left: auto; font-size: 11px; color: #3a5e75; }
+
+    /* BUS toggle */
+    .toggle-row { display: flex; align-items: center; gap: 10px; font-size: 13px; cursor: pointer; }
+    .switch { position: relative; width: 38px; height: 20px; flex-shrink: 0; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; inset: 0;
+      background: #1e3045; border-radius: 20px; transition: .3s; cursor: pointer;
+    }
+    .slider:before {
+      content: ""; position: absolute;
+      width: 14px; height: 14px; border-radius: 50%;
+      background: #fff; left: 3px; bottom: 3px; transition: .3s;
+    }
+    .switch input:checked + .slider { background: #1a7a4a; }
+    .switch input:checked + .slider:before { transform: translateX(18px); }
+
+    #reset {
+      margin: 14px 16px;
+      padding: 8px; width: calc(100% - 32px);
+      background: #1a5276; color: #fff;
+      border: none; border-radius: 6px;
+      font-size: 13px; cursor: pointer;
+    }
+    #reset:hover { background: #2472a4; }
+
+    #footer {
+      margin-top: auto; padding: 14px 16px;
+      font-size: 11px; color: #2a4a60; line-height: 1.6;
+    }
+
+    /* ── Map ─────────────────────────────────────────────────── */
+    #map { flex: 1; }
+
+    /* ── Loading overlay ─────────────────────────────────────── */
+    #loading {
+      position: fixed; inset: 0;
+      background: rgba(10,20,30,.85);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 9999; color: #fff; font-size: 15px; gap: 14px;
+    }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 4px solid #1a5276;
+      border-top-color: #5dade2;
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Popup ───────────────────────────────────────────────── */
+    .popup { font-size: 13px; min-width: 230px; max-width: 290px; }
+    .popup-name {
+      font-size: 14px; font-weight: bold; color: #1a5276;
+      padding-bottom: 7px; margin-bottom: 8px;
+      border-bottom: 1px solid #eee;
+      display: flex; align-items: center; flex-wrap: wrap; gap: 5px;
+    }
+    .bus-pill {
+      font-size: 10px; background: #1a5276; color: #fff;
+      padding: 2px 7px; border-radius: 10px;
+    }
+    .tags { margin-bottom: 9px; }
+    .tag {
+      display: inline-block; color: #fff; font-size: 10px;
+      padding: 2px 7px; border-radius: 10px;
+      margin: 2px 2px 2px 0;
+    }
+    .popup p { margin: 4px 0; color: #444; word-break: break-word; }
+    .popup a { color: #1a5276; }
+    .cert-line { margin-top: 7px; font-size: 11px; color: #999; }
+  </style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<div id="sidebar">
+  <div id="sidebar-header">
+    <h1>MCS Installer Map</h1>
+    <p>Updated daily from mcscertified.com</p>
+  </div>
+
+  <div id="count-bar">
+    <strong id="shown">–</strong> of <strong id="total">–</strong> installers shown
+  </div>
+
+  <div class="section">
+    <h3>Search</h3>
+    <input id="search" type="text" placeholder="Company name or postcode…"/>
+  </div>
+
+  <div class="section">
+    <h3>Technology</h3>
+    <div id="tech-list"></div>
+  </div>
+
+  <div class="section">
+    <h3>Scheme</h3>
+    <label class="toggle-row">
+      <div class="switch">
+        <input type="checkbox" id="bus-toggle"/>
+        <span class="slider"></span>
+      </div>
+      BUS Registered only
+    </label>
+  </div>
+
+  <button id="reset">Reset Filters</button>
+
+  <div id="footer">
+    Data sourced from MCS Certified.<br>
+    Refreshed each weekday at 9 am.
+  </div>
+</div>
+
+<!-- Map -->
+<div id="map"></div>
+
+<!-- Loading -->
+<div id="loading">
+  <div class="spinner"></div>
+  <span>Loading installer data…</span>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script>
+/* ── Technology config ───────────────────────────────────────── */
+const TECHS = {
+  "Air Source Heat Pump":     "#27ae60",
+  "Ground Source Heat Pump":  "#1e8449",
+  "Exhaust Air Heat Pump":    "#1abc9c",
+  "Water Source Heat Pump":   "#148f77",
+  "Gas Absorption Heat Pump": "#2ecc71",
+  "Solar Assisted Heat Pump": "#239b56",
+  "Solar Photovoltaic":       "#d4ac0d",
+  "Solar Thermal":            "#e67e22",
+  "Battery Storage":          "#7d3c98",
+  "Biomass":                  "#784212",
+  "Hydro":                    "#1a5276",
+  "Wind Turbine":             "#117a65",
+  "Micro CHP":                "#c0392b",
+};
+const TECH_ORDER = Object.keys(TECHS);
+
+function primaryColor(techs) {
+  for (const t of TECH_ORDER) if (techs.includes(t)) return TECHS[t];
+  return "#7f8c8d";
+}
+
+/* ── Map setup ───────────────────────────────────────────────── */
+const map = L.map("map", { center: [54.5, -3.5], zoom: 6 });
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a>',
+  maxZoom: 18,
+}).addTo(map);
+
+const cluster = L.markerClusterGroup({ chunkedLoading: true, maxClusterRadius: 50 });
+map.addLayer(cluster);
+
+/* ── State ───────────────────────────────────────────────────── */
+let allMarkers = [];
+let activeTechs = new Set(TECH_ORDER);
+let busOnly = false;
+let searchTerm = "";
+
+/* ── Popup builder ───────────────────────────────────────────── */
+function buildPopup(d) {
+  const bus   = d.bus ? '<span class="bus-pill">BUS</span>' : "";
+  const tags  = d.techs.map(t => `<span class="tag" style="background:${TECHS[t]||'#555'}">${t}</span>`).join("");
+  const phone = d.phone   ? `<p>📞 <a href="tel:${d.phone}">${d.phone}</a></p>` : "";
+  const email = d.email   ? `<p>✉️ <a href="mailto:${d.email}">${d.email}</a></p>` : "";
+  const site  = d.website ? `<p>🌐 <a href="${d.website}" target="_blank" rel="noopener">${d.website}</a></p>` : "";
+  const mapsHref = d.postcode
+    ? `https://www.google.com/maps/search/${encodeURIComponent(d.postcode)}`
+    : `https://www.google.com/maps/search/${encodeURIComponent(d.address)}`;
+  const addr  = `<p>📍 <a href="${mapsHref}" target="_blank" rel="noopener">${d.address}</a></p>`;
+  const cert  = d.cert ? `<p class="cert-line">${d.cert_body} · ${d.cert}</p>` : "";
+  return `
+    <div class="popup">
+      <div class="popup-name">${d.name} ${bus}</div>
+      <div class="tags">${tags}</div>
+      ${phone}${email}${site}${addr}${cert}
+    </div>`;
+}
+
+/* ── Initialise map from data ────────────────────────────────── */
+function initMap(data) {
+  document.getElementById("loading").style.display = "none";
+  document.getElementById("total").textContent = data.length.toLocaleString();
+
+  data.forEach(d => {
+    if (!d.lat || !d.lng) return;
+    const color  = primaryColor(d.techs);
+    const marker = L.circleMarker([d.lat, d.lng], {
+      radius: 7, fillColor: color,
+      color: "#fff", weight: 1.5,
+      opacity: 1, fillOpacity: 0.85,
+    });
+    marker.bindTooltip(d.name, { direction: "top", offset: [0, -5] });
+    marker.bindPopup(buildPopup(d), { maxWidth: 310 });
+    marker._d = d;
+    allMarkers.push(marker);
+    cluster.addLayer(marker);
+  });
+
+  buildTechList(data);
+  updateCount();
+}
+
+/* ── Sidebar: technology checkboxes ─────────────────────────── */
+function buildTechList(data) {
+  const counts = {};
+  data.forEach(d => d.techs.forEach(t => { counts[t] = (counts[t] || 0) + 1; }));
+
+  const el = document.getElementById("tech-list");
+  TECH_ORDER.forEach(tech => {
+    const n = counts[tech] || 0;
+    const row = document.createElement("label");
+    row.className = "tech-row";
+    row.innerHTML = `
+      <input type="checkbox" checked data-tech="${tech}"/>
+      <span class="dot" style="background:${TECHS[tech]}"></span>
+      ${tech}
+      <span class="tech-n">${n.toLocaleString()}</span>`;
+    row.querySelector("input").addEventListener("change", e => {
+      e.target.checked ? activeTechs.add(tech) : activeTechs.delete(tech);
+      applyFilters();
+    });
+    el.appendChild(row);
+  });
+}
+
+/* ── Filter logic ────────────────────────────────────────────── */
+function applyFilters() {
+  const term = searchTerm.toLowerCase();
+  cluster.clearLayers();
+  let shown = 0;
+  allMarkers.forEach(m => {
+    const d = m._d;
+    const techOk   = d.techs.some(t => activeTechs.has(t));
+    const busOk    = !busOnly || d.bus;
+    const searchOk = !term ||
+      d.name.toLowerCase().includes(term) ||
+      (d.postcode || "").toLowerCase().includes(term);
+    if (techOk && busOk && searchOk) { cluster.addLayer(m); shown++; }
+  });
+  document.getElementById("shown").textContent = shown.toLocaleString();
+}
+
+function updateCount() {
+  document.getElementById("shown").textContent = allMarkers.length.toLocaleString();
+}
+
+/* ── Event listeners ─────────────────────────────────────────── */
+document.getElementById("search").addEventListener("input", e => {
+  searchTerm = e.target.value;
+  applyFilters();
+});
+
+document.getElementById("bus-toggle").addEventListener("change", e => {
+  busOnly = e.target.checked;
+  applyFilters();
+});
+
+document.getElementById("reset").addEventListener("click", () => {
+  activeTechs = new Set(TECH_ORDER);
+  busOnly = false;
+  searchTerm = "";
+  document.getElementById("search").value = "";
+  document.getElementById("bus-toggle").checked = false;
+  document.querySelectorAll("#tech-list input").forEach(cb => cb.checked = true);
+  cluster.clearLayers();
+  allMarkers.forEach(m => cluster.addLayer(m));
+  updateCount();
+});
+
+/* ── Fetch data ──────────────────────────────────────────────── */
+fetch("installers.json")
+  .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+  .then(initMap)
+  .catch(() => {
+    document.getElementById("loading").innerHTML =
+      "<p style='color:#e74c3c'>Failed to load installer data.<br>Please try refreshing.</p>";
+  });
+</script>
+</body>
+</html>
