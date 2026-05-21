@@ -439,8 +439,7 @@ function getUserName(user) {
 }
 
 function isAdmin(user) {
-  return ADMIN_EMAILS.includes((user?.email || '').toLowerCase())
-    || new URLSearchParams(location.search).has('admin');
+  return ADMIN_EMAILS.includes((user?.email || '').toLowerCase());
 }
 
 document.getElementById('ms-btn').addEventListener('click', async () => {
@@ -461,7 +460,7 @@ document.getElementById('sign-out-btn').addEventListener('click', async () => {
 });
 
 const PAGE_SIZE = 50;
-const IS_ADMIN  = new URLSearchParams(location.search).has('admin');
+const IS_ADMIN  = () => isAdmin(currentUser);
 let allData  = [];
 let filtered = [];
 let page     = 1;
@@ -499,6 +498,8 @@ document.getElementById('edit-save').addEventListener('click', async () => {
     outcome:         document.getElementById('edit-outcome').value,
     follow_up_date:  document.getElementById('edit-followup').value || null,
     notes:           document.getElementById('edit-notes').value.trim(),
+    updated_at:      new Date().toISOString(),
+    updated_by:      currentUser?.email || 'unknown',
   }).eq('id', id);
 
   btn.disabled = false; btn.textContent = 'Save Changes';
@@ -508,9 +509,21 @@ document.getElementById('edit-save').addEventListener('click', async () => {
 });
 
 async function deleteContact(id) {
-  if (!confirm('Permanently delete this contact log? This cannot be undone.')) return;
-  const { error } = await db.from('contacts').delete().eq('id', id);
+  if (!confirm('This will mark the log as deleted. You can restore it later. Continue?')) return;
+  const { error } = await db.from('contacts').update({
+    deleted_at: new Date().toISOString(),
+    deleted_by: currentUser?.email || 'unknown',
+  }).eq('id', id);
   if (error) { alert('Failed to delete: ' + error.message); return; }
+  await loadData();
+}
+
+async function restoreContact(id) {
+  const { error } = await db.from('contacts').update({
+    deleted_at: null,
+    deleted_by: null,
+  }).eq('id', id);
+  if (error) { alert('Failed to restore: ' + error.message); return; }
   await loadData();
 }
 
@@ -628,11 +641,13 @@ function buildEmployeeChart() {
   });
 }
 
+let showDeleted = false;
+
 async function loadData() {
-  const { data, error } = await db
-    .from('contacts')
-    .select('*')
-    .order('contacted_at', { ascending: false });
+  let query = db.from('contacts').select('*').order('contacted_at', { ascending: false });
+  if (!showDeleted) query = query.is('deleted_at', null);
+
+  const { data, error } = await query;
 
   if (error) {
     document.getElementById('tbody').innerHTML =
@@ -712,8 +727,8 @@ function render() {
   document.getElementById('result-count').textContent =
     `${filtered.length.toLocaleString()} result${filtered.length !== 1 ? 's' : ''}`;
 
-  const colspan = IS_ADMIN ? 6 : 5;
-  document.getElementById('actions-header').style.display = IS_ADMIN ? '' : 'none';
+  const colspan = IS_ADMIN() ? 6 : 5;
+  document.getElementById('actions-header').style.display = IS_ADMIN() ? '' : 'none';
 
   const tbody = document.getElementById('tbody');
   if (!rows.length) {
@@ -723,19 +738,34 @@ function render() {
   }
 
   tbody.innerHTML = rows.map(r => {
-    const dt      = new Date(r.contacted_at);
-    const dateStr = dt.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
-    const timeStr = dt.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
-    const color   = OUTCOME_COLORS[r.outcome] || '#aaa';
-    const notes   = r.notes ? `<span class="td-notes">${escHtml(r.notes)}</span>` : '<span style="color:#ccc">—</span>';
-    const actions = IS_ADMIN
-      ? `<td style="white-space:nowrap">
-           <button class="btn-edit" onclick="openEdit('${r.id}')">Edit</button>
-           <button class="btn-del"  onclick="deleteContact('${r.id}')">Delete</button>
-         </td>`
+    const dt       = new Date(r.contacted_at);
+    const dateStr  = dt.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+    const timeStr  = dt.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+    const color    = OUTCOME_COLORS[r.outcome] || '#aaa';
+    const isDeleted = !!r.deleted_at;
+    const rowStyle  = isDeleted ? 'opacity:0.5;background:#fff5f5;' : '';
+
+    const editedBadge = r.updated_at
+      ? `<br><span style="font-size:10px;color:#aaa">Edited by ${escHtml(r.updated_by||'?')} · ${new Date(r.updated_at).toLocaleDateString('en-GB')}</span>`
       : '';
-    return `<tr>
-      <td style="white-space:nowrap">${dateStr}<br><span style="color:#aaa;font-size:11px">${timeStr}</span></td>
+    const deletedBadge = isDeleted
+      ? `<br><span style="font-size:10px;color:#c0392b">Deleted by ${escHtml(r.deleted_by||'?')} · ${new Date(r.deleted_at).toLocaleDateString('en-GB')}</span>`
+      : '';
+
+    const notes = r.notes ? `<span class="td-notes">${escHtml(r.notes)}</span>` : '<span style="color:#ccc">—</span>';
+
+    let actions = '';
+    if (IS_ADMIN()) {
+      actions = isDeleted
+        ? `<td style="white-space:nowrap"><button class="btn-edit" onclick="restoreContact('${r.id}')">Restore</button></td>`
+        : `<td style="white-space:nowrap">
+             <button class="btn-edit" onclick="openEdit('${r.id}')">Edit</button>
+             <button class="btn-del"  onclick="deleteContact('${r.id}')">Delete</button>
+           </td>`;
+    }
+
+    return `<tr style="${rowStyle}">
+      <td style="white-space:nowrap">${dateStr}<br><span style="color:#aaa;font-size:11px">${timeStr}</span>${deletedBadge}${editedBadge}</td>
       <td class="td-name">${escHtml(r.installer_name || '—')}</td>
       <td>${escHtml(r.employee)}</td>
       <td><span class="outcome-pill" style="background:${color}">${escHtml(r.outcome)}</span></td>
@@ -816,10 +846,17 @@ function onAuthenticated(user) {
   currentUser = user;
   document.getElementById('login-screen').classList.remove('visible');
   document.getElementById('user-name-display').textContent = getUserName(user);
-  if (isAdmin(user) && !new URLSearchParams(location.search).has('admin')) {
-    const url = new URL(location.href);
-    url.searchParams.set('admin', 'true');
-    history.replaceState({}, '', url);
+  if (isAdmin(user)) {
+    const toggleBtn = document.createElement('button');
+    toggleBtn.className = 'btn-secondary';
+    toggleBtn.style.cssText = 'font-size:12px;padding:5px 12px;';
+    toggleBtn.textContent = 'Show deleted records';
+    toggleBtn.addEventListener('click', async () => {
+      showDeleted = !showDeleted;
+      toggleBtn.textContent = showDeleted ? 'Hide deleted records' : 'Show deleted records';
+      await loadData();
+    });
+    document.querySelector('.table-header').appendChild(toggleBtn);
   }
 }
 
