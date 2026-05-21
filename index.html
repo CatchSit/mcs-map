@@ -813,7 +813,11 @@ document.getElementById("reset").addEventListener("click", () => {
 });
 
 /* ── Bootstrap ───────────────────────────────────────────── */
+let appStarted = false;
+
 async function startApp() {
+  if (appStarted) return;
+  appStarted = true;
   try {
     const r = await fetch("installers.json");
     if (!r.ok) throw new Error(r.status);
@@ -828,7 +832,6 @@ async function startApp() {
   }
 }
 
-// Check for existing session on load
 db.auth.getSession().then(({ data: { session } }) => {
   if (session?.user) {
     onAuthenticated(session.user);
@@ -839,11 +842,10 @@ db.auth.getSession().then(({ data: { session } }) => {
   }
 });
 
-// After sign-in redirect, auth state change fires — start app then
 db.auth.onAuthStateChange((event, session) => {
   if (event === 'SIGNED_IN' && session?.user) {
     onAuthenticated(session.user);
-    if (!allMarkers.length) startApp();
+    startApp();
   }
 });
 
