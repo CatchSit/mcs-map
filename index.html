@@ -145,6 +145,42 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* ── Login screen ─────────────────────────────────────────── */
+    #login-screen {
+      display: none; position: fixed; inset: 0;
+      background: #0a141e; z-index: 10000;
+      align-items: center; justify-content: center;
+    }
+    #login-screen.visible { display: flex; }
+    #login-card {
+      background: #0f1d2b; border: 1px solid #1e3045;
+      border-radius: 12px; padding: 44px 40px;
+      width: 380px; max-width: 92vw; text-align: center;
+      box-shadow: 0 24px 60px rgba(0,0,0,.6);
+    }
+    #login-card h1 { font-size: 22px; color: #fff; margin-bottom: 6px; }
+    #login-card p  { font-size: 13px; color: #7aaccc; margin-bottom: 32px; line-height: 1.5; }
+    #ms-btn {
+      display: flex; align-items: center; justify-content: center; gap: 12px;
+      width: 100%; padding: 13px 20px;
+      background: #fff; color: #333; border: none;
+      border-radius: 6px; font-size: 14px; font-weight: 600;
+      cursor: pointer; transition: background .15s;
+    }
+    #ms-btn:hover { background: #f0f0f0; }
+    #ms-btn svg { flex-shrink: 0; }
+    #login-error { margin-top: 16px; font-size: 12px; color: #e74c3c; display: none; }
+
+    /* Sign-out button in sidebar */
+    #sign-out-btn {
+      display: block; width: 100%; margin-top: 10px;
+      padding: 6px; background: rgba(255,255,255,.1);
+      color: #acd4f5; border: 1px solid rgba(255,255,255,.2);
+      border-radius: 6px; font-size: 11px; cursor: pointer; text-align: center;
+    }
+    #sign-out-btn:hover { background: rgba(255,255,255,.2); }
+    #user-name-display { font-size: 11px; color: #acd4f5; margin-top: 6px; }
+
     /* ── Popup ────────────────────────────────────────────── */
     .popup { font-size: 13px; min-width: 240px; max-width: 300px; }
     .popup-name {
@@ -209,6 +245,24 @@
 </head>
 <body>
 
+<!-- ── Login screen ──────────────────────────────────────── -->
+<div id="login-screen">
+  <div id="login-card">
+    <h1>MCS Installer Map</h1>
+    <p>Sign in with your company Microsoft account to continue.</p>
+    <button id="ms-btn">
+      <svg width="20" height="20" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+        <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+        <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+        <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+      </svg>
+      Sign in with Microsoft
+    </button>
+    <p id="login-error">Sign-in failed. Please try again.</p>
+  </div>
+</div>
+
 <!-- ── Mobile controls ──────────────────────────────────── -->
 <button id="menu-btn" aria-label="Open menu">&#9776;</button>
 <div id="sidebar-overlay"></div>
@@ -218,7 +272,9 @@
   <div id="sidebar-header">
     <h1>MCS Installer Map</h1>
     <p>Updated daily from mcscertified.com</p>
+    <div id="user-name-display"></div>
     <a href="dashboard.html" style="display:inline-block;margin-top:10px;padding:6px 14px;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:6px;font-size:12px;text-decoration:none;">📊 Manager Dashboard</a>
+    <button id="sign-out-btn">Sign out</button>
   </div>
 
   <div id="count-bar">
@@ -354,6 +410,56 @@ const db = createClient(
   'https://teezsldwkpwzgvfizial.supabase.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRlZXpzbGR3a3B3emd2Zml6aWFsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5NzUxMjAsImV4cCI6MjA5NDU1MTEyMH0.8rRoiHuS98HZp4jHSYbL31J3O9fn36tKEy9ooosPoGU'
 );
+
+/* ── Auth ────────────────────────────────────────────────── */
+let currentUser = null;
+
+function getUserName(user) {
+  return user.user_metadata?.full_name
+    || user.user_metadata?.name
+    || user.email?.split('@')[0]
+    || 'User';
+}
+
+function showLoginScreen() {
+  document.getElementById('login-screen').classList.add('visible');
+}
+
+function hideLoginScreen() {
+  document.getElementById('login-screen').classList.remove('visible');
+}
+
+function onAuthenticated(user) {
+  currentUser = user;
+  hideLoginScreen();
+  const name = getUserName(user);
+  document.getElementById('user-name-display').textContent = `Signed in as ${name}`;
+}
+
+document.getElementById('ms-btn').addEventListener('click', async () => {
+  document.getElementById('login-error').style.display = 'none';
+  const { error } = await db.auth.signInWithOAuth({
+    provider: 'azure',
+    options: {
+      scopes: 'email profile openid',
+      redirectTo: window.location.href.split('#')[0],
+    }
+  });
+  if (error) {
+    document.getElementById('login-error').style.display = 'block';
+  }
+});
+
+document.getElementById('sign-out-btn').addEventListener('click', async () => {
+  await db.auth.signOut();
+  showLoginScreen();
+});
+
+db.auth.onAuthStateChange((event, session) => {
+  if (session?.user) {
+    onAuthenticated(session.user);
+  }
+});
 
 /* ── Technology config ───────────────────────────────────── */
 const TECHS = {
@@ -589,11 +695,22 @@ async function loadContacts() {
 function openModal(id, name) {
   document.getElementById('modal-installer-id').value        = id;
   document.getElementById('modal-installer-name').textContent = name;
-  document.getElementById('modal-employee').value            = '';
   document.getElementById('modal-outcome').value             = '';
   document.getElementById('modal-notes').value               = '';
   document.getElementById('modal-followup-date').value       = '';
   document.getElementById('followup-date-group').style.display = 'none';
+  const empField = document.getElementById('modal-employee');
+  if (currentUser) {
+    empField.value    = getUserName(currentUser);
+    empField.readOnly = true;
+    empField.style.background = '#f5f5f5';
+    empField.style.color      = '#666';
+  } else {
+    empField.value    = '';
+    empField.readOnly = false;
+    empField.style.background = '';
+    empField.style.color      = '';
+  }
   document.getElementById('modal-overlay').classList.add('open');
 }
 
@@ -696,18 +813,39 @@ document.getElementById("reset").addEventListener("click", () => {
 });
 
 /* ── Bootstrap ───────────────────────────────────────────── */
-fetch("installers.json")
-  .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
-  .then(async data => {
+async function startApp() {
+  try {
+    const r = await fetch("installers.json");
+    if (!r.ok) throw new Error(r.status);
+    const data = await r.json();
     document.getElementById("loading").style.display = "none";
     initMap(data);
     await loadContacts();
     applyFilters();
-  })
-  .catch(() => {
+  } catch {
     document.getElementById("loading").innerHTML =
       "<p style='color:#e74c3c'>Failed to load installer data.<br>Please try refreshing.</p>";
-  });
+  }
+}
+
+// Check for existing session on load
+db.auth.getSession().then(({ data: { session } }) => {
+  if (session?.user) {
+    onAuthenticated(session.user);
+    startApp();
+  } else {
+    document.getElementById("loading").style.display = "none";
+    showLoginScreen();
+  }
+});
+
+// After sign-in redirect, auth state change fires — start app then
+db.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_IN' && session?.user) {
+    onAuthenticated(session.user);
+    if (!allMarkers.length) startApp();
+  }
+});
 
 </script>
 </body>

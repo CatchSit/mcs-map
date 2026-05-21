@@ -205,6 +205,29 @@
       .cards { grid-template-columns: 1fr 1fr; }
     }
 
+    /* ── Login screen ────────────────────────────────────────── */
+    #login-screen {
+      display: none; position: fixed; inset: 0;
+      background: #0a141e; z-index: 10000;
+      align-items: center; justify-content: center;
+    }
+    #login-screen.visible { display: flex; }
+    #login-card {
+      background: #fff; border-radius: 12px;
+      padding: 44px 40px; width: 380px; max-width: 92vw;
+      text-align: center; box-shadow: 0 24px 60px rgba(0,0,0,.5);
+    }
+    #login-card h1 { font-size: 22px; color: #1a5276; margin-bottom: 6px; }
+    #login-card p  { font-size: 13px; color: #666; margin-bottom: 32px; line-height: 1.5; }
+    #ms-btn {
+      display: flex; align-items: center; justify-content: center; gap: 12px;
+      width: 100%; padding: 13px 20px;
+      background: #1a5276; color: #fff; border: none;
+      border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer;
+    }
+    #ms-btn:hover { background: #2472a4; }
+    #login-error { margin-top: 14px; font-size: 12px; color: #c0392b; display: none; }
+
     /* ── Charts ──────────────────────────────────────────────── */
     .charts-grid {
       display: grid;
@@ -241,8 +264,10 @@
     <p>MCS Installer Contact Log</p>
   </div>
   <div class="header-right">
+    <span id="user-name-display" style="font-size:12px;color:#acd4f5;"></span>
     <a href="index.html" class="nav-btn">← Back to Map</a>
     <button class="export-btn" id="export-btn">Export CSV</button>
+    <button class="nav-btn" id="sign-out-btn" style="background:rgba(255,255,255,.1)">Sign out</button>
   </div>
 </header>
 
@@ -337,6 +362,24 @@
   </div>
 </main>
 
+<!-- Login screen -->
+<div id="login-screen">
+  <div id="login-card">
+    <h1>CRM Dashboard</h1>
+    <p>Sign in with your company Microsoft account to continue.</p>
+    <button id="ms-btn">
+      <svg width="20" height="20" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+        <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+        <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+        <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+      </svg>
+      Sign in with Microsoft
+    </button>
+    <p id="login-error">Sign-in failed. Please try again.</p>
+  </div>
+</div>
+
 <!-- Edit modal (admin only) -->
 <div id="edit-overlay">
   <div id="edit-modal">
@@ -383,6 +426,39 @@ const OUTCOME_COLORS = {
   "Not Interested": "#7f8c8d",
   "No Answer":      "#95a5a6",
 };
+
+/* ── Auth ──────────────────────────────────────────────────── */
+let currentUser = null;
+const ADMIN_EMAILS = ['greg@amcorenewables.co.uk'];
+
+function getUserName(user) {
+  return user.user_metadata?.full_name
+    || user.user_metadata?.name
+    || user.email?.split('@')[0]
+    || 'User';
+}
+
+function isAdmin(user) {
+  return ADMIN_EMAILS.includes((user?.email || '').toLowerCase())
+    || new URLSearchParams(location.search).has('admin');
+}
+
+document.getElementById('ms-btn').addEventListener('click', async () => {
+  document.getElementById('login-error').style.display = 'none';
+  const { error } = await db.auth.signInWithOAuth({
+    provider: 'azure',
+    options: {
+      scopes: 'email profile openid',
+      redirectTo: window.location.href.split('#')[0],
+    }
+  });
+  if (error) document.getElementById('login-error').style.display = 'block';
+});
+
+document.getElementById('sign-out-btn').addEventListener('click', async () => {
+  await db.auth.signOut();
+  document.getElementById('login-screen').classList.add('visible');
+});
 
 const PAGE_SIZE = 50;
 const IS_ADMIN  = new URLSearchParams(location.search).has('admin');
@@ -736,7 +812,32 @@ const month   = new Date(Date.now() - 30*864e5).toISOString().slice(0,10);
 document.getElementById('f-to').value   = today;
 document.getElementById('f-from').value = month;
 
-loadData();
+function onAuthenticated(user) {
+  currentUser = user;
+  document.getElementById('login-screen').classList.remove('visible');
+  document.getElementById('user-name-display').textContent = getUserName(user);
+  if (isAdmin(user) && !new URLSearchParams(location.search).has('admin')) {
+    const url = new URL(location.href);
+    url.searchParams.set('admin', 'true');
+    history.replaceState({}, '', url);
+  }
+}
+
+db.auth.getSession().then(({ data: { session } }) => {
+  if (session?.user) {
+    onAuthenticated(session.user);
+    loadData();
+  } else {
+    document.getElementById('login-screen').classList.add('visible');
+  }
+});
+
+db.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_IN' && session?.user) {
+    onAuthenticated(session.user);
+    if (!allData.length) loadData();
+  }
+});
 </script>
 </body>
 </html>
