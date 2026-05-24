@@ -1090,11 +1090,11 @@ const warehouseIcon = L.divIcon({
   html: `<div style="width:20px;height:20px;border-radius:5px;background:#2f5a3d;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:700;font-family:'Inter',sans-serif">A</div>`,
   className: '', iconSize: [24, 24], iconAnchor: [12, 12],
 });
-L.marker([53.5246, -1.0826], { icon: warehouseIcon, zIndexOffset: 1000 })
-  .bindTooltip('Amco warehouse · Rotherham', { direction:'top', offset:[0,-8], className:'day-tooltip' })
+L.marker([53.5436, -1.0992], { icon: warehouseIcon, zIndexOffset: 1000 })
+  .bindTooltip('Amco warehouse · DN2 4NH', { direction:'top', offset:[0,-8], className:'day-tooltip' })
   .addTo(map);
 
-const WAREHOUSE = [53.5246, -1.0826];
+const WAREHOUSE = [53.5436, -1.0992];
 const radiusCircle = L.circle(WAREHOUSE, {
   radius: 50 * 1609.344,
   color: "#5d8a64", weight: 1.5, dashArray: "6 6",
