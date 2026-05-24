@@ -1025,16 +1025,23 @@ function latestContact(id) {
   return list.reduce((a, b) => new Date(a.contacted_at) > new Date(b.contacted_at) ? a : b);
 }
 
-// Build a solid dot divIcon coloured by pipeline status.
-// Not contacted = black. Contacted = status colour.
+// Build a pin-shape divIcon. Pin body = pipeline status color, or black
+// when uncontacted (matching the "Not contacted" pipeline status colour).
 function makeMarkerIcon(d, latest) {
-  const color = latest && STATUS[latest.outcome] ? STATUS[latest.outcome].color : '#000000';
-  const size  = 11;
-  const total = size + 6;
-  const html  = `<div class="day-marker" style="width:${total}px;height:${total}px;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 1px 2px rgba(0,0,0,.22))">
-    <div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2px solid #fff"></div>
-  </div>`;
-  return L.divIcon({ html, className: '', iconSize: [total, total], iconAnchor: [total/2, total/2] });
+  const statusC = latest && STATUS[latest.outcome] ? STATUS[latest.outcome].color : null;
+  const color   = statusC || '#000000';
+  const size    = 16;            // pin head width
+  const height  = Math.round(size * 1.45);
+  // Teardrop path: rounded head, pointed tail at bottom-center.
+  const path = `M${size/2} 0 C ${size*0.86} 0, ${size} ${size*0.26}, ${size} ${size*0.5} C ${size} ${size*0.78}, ${size/2} ${height}, ${size/2} ${height} C ${size/2} ${height}, 0 ${size*0.78}, 0 ${size*0.5} C 0 ${size*0.26}, ${size*0.14} 0, ${size/2} 0 Z`;
+  // Body of pin
+  const body = `<div style="width:${size}px;height:${height}px;background:${color};clip-path:path('${path}');filter:drop-shadow(0 2px 3px rgba(0,0,0,.28));"></div>`;
+  // White core at the pin's head
+  const core = `<div style="position:absolute;top:${Math.round(size*0.3)}px;left:50%;transform:translateX(-50%);width:${Math.round(size*0.36)}px;height:${Math.round(size*0.36)}px;border-radius:50%;background:#fff;box-shadow:inset 0 0 0 1px rgba(0,0,0,.08);"></div>`;
+  const html = `<div class="day-marker" style="position:relative;width:${size}px;height:${height}px;">${body}${core}</div>`;
+  // Anchor the pin's tip (bottom-center) to the latlng so it visually
+  // "sits" on the location like a real map pin.
+  return L.divIcon({ html, className: '', iconSize: [size, height], iconAnchor: [size/2, height] });
 }
 
 // Drop-in replacement for the original applyMarkerStyle(); since we use L.marker
