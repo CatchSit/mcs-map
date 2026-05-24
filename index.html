@@ -789,7 +789,7 @@
 
   <div class="section">
     <h3>Pipeline</h3>
-    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#cfd0c4"></span>Not contacted</span><span class="stat-n" id="stat-none">–</span></div>
+    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#000"></span>Not contacted</span><span class="stat-n" id="stat-none">–</span></div>
     <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:var(--status-noanswer-c)"></span>No answer</span><span class="stat-n" id="stat-noanswer">–</span></div>
     <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:var(--status-interested-c)"></span>Interested</span><span class="stat-n" id="stat-interested">–</span></div>
     <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:var(--status-followup-c)"></span>Follow up</span><span class="stat-n" id="stat-followup">–</span></div>
@@ -1025,20 +1025,15 @@ function latestContact(id) {
   return list.reduce((a, b) => new Date(a.contacted_at) > new Date(b.contacted_at) ? a : b);
 }
 
-// Build a ringed-dot divIcon. Inner = tech color. Outer ring = status color (if logged).
+// Build a solid dot divIcon coloured by pipeline status.
+// Not contacted = black. Contacted = status colour.
 function makeMarkerIcon(d, latest) {
-  const techC   = primaryColor(d.techs);
-  const statusC = latest && STATUS[latest.outcome] ? STATUS[latest.outcome].color : null;
-  const size  = 12;
-  const total = size + 10;
-  const shadow = statusC
-    ? `filter: drop-shadow(0 1px 2px rgba(0,0,0,.18));`
-    : `filter: drop-shadow(0 1px 2px rgba(0,0,0,.18));`;
-  const ring = statusC
-    ? `<div style="position:absolute;inset:0;border-radius:50%;background:#fff;border:2.5px solid ${statusC}"></div>`
-    : '';
-  const inner = `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${techC};border:1.5px solid #fff;${statusC ? '' : 'box-shadow:0 0 0 1px rgba(0,0,0,.08);'}"></div>`;
-  const html = `<div class="day-marker" style="position:relative;width:${total}px;height:${total}px;display:flex;align-items:center;justify-content:center;${shadow}">${ring}${inner}</div>`;
+  const color = latest && STATUS[latest.outcome] ? STATUS[latest.outcome].color : '#000000';
+  const size  = 11;
+  const total = size + 6;
+  const html  = `<div class="day-marker" style="width:${total}px;height:${total}px;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 1px 2px rgba(0,0,0,.22))">
+    <div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2px solid #fff"></div>
+  </div>`;
   return L.divIcon({ html, className: '', iconSize: [total, total], iconAnchor: [total/2, total/2] });
 }
 
