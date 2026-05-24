@@ -392,6 +392,9 @@
     <label>Notes <span style="font-weight:normal;color:#aaa;">(optional)</span></label>
     <textarea id="modal-notes" placeholder="Any details from the conversation…"></textarea>
 
+    <label>Next Action <span style="font-weight:normal;color:#aaa;">(optional)</span></label>
+    <textarea id="modal-next-action" placeholder="What needs to happen next…"></textarea>
+
     <div class="modal-btns">
       <button class="btn-secondary" id="modal-cancel">Cancel</button>
       <button class="btn-primary" id="modal-submit">Save Contact</button>
@@ -560,6 +563,7 @@ function buildContactHistory(id) {
       return `<div class="contact-entry" style="border-left-color:${borderColor}">
         <span class="outcome">${c.outcome}</span> · ${c.employee} · ${date}${due}
         ${c.notes ? `<br><span style="color:#777">${c.notes}</span>` : ''}
+        ${c.next_action ? `<br><span style="color:#1a5276;font-size:11px">→ ${c.next_action}</span>` : ''}
       </div>`;
     }).join('');
 }
@@ -697,6 +701,7 @@ function openModal(id, name) {
   document.getElementById('modal-installer-name').textContent = name;
   document.getElementById('modal-outcome').value             = '';
   document.getElementById('modal-notes').value               = '';
+  document.getElementById('modal-next-action').value        = '';
   document.getElementById('modal-followup-date').value       = '';
   document.getElementById('followup-date-group').style.display = 'none';
   const empField = document.getElementById('modal-employee');
@@ -755,6 +760,8 @@ document.getElementById('modal-submit').addEventListener('click', async () => {
   const { data, error } = await db.from('contacts').insert([{
     installer_id: id, installer_name: name, employee, outcome, notes,
     follow_up_date: followUpDate,
+    employee_email: currentUser?.email || null,
+    next_action: document.getElementById('modal-next-action').value.trim() || null,
   }]).select();
 
   btn.disabled = false; btn.textContent = 'Save Contact';

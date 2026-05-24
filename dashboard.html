@@ -148,6 +148,52 @@
     }
     .btn-del:hover { background: #c0392b; color: #fff; }
 
+    /* ── Log Contact modal (dashboard) ──────────────────────── */
+    #log-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.5); z-index: 9000;
+      align-items: center; justify-content: center;
+    }
+    #log-overlay.open { display: flex; }
+    #log-modal {
+      background: #fff; border-radius: 10px;
+      padding: 26px; width: 460px; max-width: 94vw;
+      box-shadow: 0 20px 60px rgba(0,0,0,.3);
+      max-height: 90vh; overflow-y: auto;
+    }
+    #log-modal h2 { font-size: 16px; color: #1a5276; margin-bottom: 16px; }
+    #log-modal label { display: block; font-size: 12px; font-weight: bold; color: #555; margin-bottom: 4px; }
+    #log-modal input, #log-modal select, #log-modal textarea {
+      width: 100%; padding: 8px 10px; border: 1px solid #ddd;
+      border-radius: 6px; font-size: 13px; margin-bottom: 14px;
+      font-family: Arial, sans-serif; outline: none;
+    }
+    #log-modal input:focus, #log-modal select:focus, #log-modal textarea:focus { border-color: #1a5276; }
+    #log-modal textarea { height: 70px; resize: vertical; }
+    #ins-results {
+      display: none; position: absolute; top: 100%; left: 0; right: 0;
+      background: #fff; border: 1px solid #ddd; border-top: none;
+      border-radius: 0 0 6px 6px; max-height: 200px; overflow-y: auto;
+      z-index: 10; box-shadow: 0 4px 12px rgba(0,0,0,.1);
+    }
+    .ins-result {
+      padding: 9px 12px; cursor: pointer; font-size: 13px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .ins-result:hover { background: #f0f6ff; }
+    #ins-selected {
+      display: none; padding: 8px 10px; margin-top: -8px; margin-bottom: 14px;
+      background: #f0f6ff; border: 1px solid #1a5276;
+      border-radius: 6px; font-size: 13px;
+      align-items: center; justify-content: space-between;
+    }
+    #ins-selected-name { color: #1a5276; font-weight: bold; }
+    #ins-clear {
+      background: none; border: none; color: #999;
+      cursor: pointer; font-size: 18px; line-height: 1; padding: 0 4px;
+    }
+    #ins-clear:hover { color: #333; }
+
     /* ── Edit modal ──────────────────────────────────────────── */
     #edit-overlay {
       display: none; position: fixed; inset: 0;
@@ -341,7 +387,10 @@
   <div class="table-wrap">
     <div class="table-header">
       <h2>Contact Log</h2>
-      <span id="result-count">–</span>
+      <div style="display:flex;align-items:center;gap:12px">
+        <span id="result-count">–</span>
+        <button class="btn-apply" id="open-log-btn" style="font-size:12px;padding:6px 14px">+ Log Contact</button>
+      </div>
     </div>
     <table>
       <thead>
@@ -380,6 +429,52 @@
   </div>
 </div>
 
+<!-- Log Contact Modal (dashboard) -->
+<div id="log-overlay">
+  <div id="log-modal">
+    <h2>Log Contact</h2>
+
+    <label>Installer</label>
+    <div style="position:relative;margin-bottom:14px">
+      <input type="text" id="ins-search" placeholder="Search by company name or postcode…" autocomplete="off"/>
+      <div id="ins-results"></div>
+      <div id="ins-selected">
+        <span id="ins-selected-name"></span>
+        <button type="button" id="ins-clear">×</button>
+      </div>
+    </div>
+    <input type="hidden" id="log-installer-id"/>
+    <input type="hidden" id="log-installer-name-val"/>
+
+    <label>Outcome</label>
+    <select id="log-outcome">
+      <option value="">-- Select outcome --</option>
+      <option value="No Answer">No Answer</option>
+      <option value="Interested">Interested</option>
+      <option value="Follow Up">Follow Up</option>
+      <option value="Not Interested">Not Interested</option>
+      <option value="Converted">Converted to Customer</option>
+      <option value="Existing Customer">Existing Customer</option>
+    </select>
+
+    <div id="log-followup-group" style="display:none">
+      <label>Follow-up Date</label>
+      <input type="date" id="log-followup-date"/>
+    </div>
+
+    <label>Notes <span style="font-weight:normal;color:#aaa">(optional)</span></label>
+    <textarea id="log-notes" placeholder="Any details from the conversation…"></textarea>
+
+    <label>Next Action <span style="font-weight:normal;color:#aaa">(optional)</span></label>
+    <textarea id="log-next-action" placeholder="What needs to happen next…"></textarea>
+
+    <div class="edit-btns">
+      <button class="btn-secondary" id="log-cancel">Cancel</button>
+      <button class="btn-primary" id="log-submit">Save Contact</button>
+    </div>
+  </div>
+</div>
+
 <!-- Edit modal (admin only) -->
 <div id="edit-overlay">
   <div id="edit-modal">
@@ -401,6 +496,8 @@
     <input type="date" id="edit-followup"/>
     <label>Notes <span style="font-weight:normal;color:#aaa">(optional)</span></label>
     <textarea id="edit-notes"></textarea>
+    <label>Next Action <span style="font-weight:normal;color:#aaa">(optional)</span></label>
+    <textarea id="edit-next-action"></textarea>
     <div class="edit-btns">
       <button class="btn-secondary" id="edit-cancel">Cancel</button>
       <button class="btn-primary" id="edit-save">Save Changes</button>
@@ -476,7 +573,12 @@ function openEdit(id) {
   document.getElementById('edit-employee').value  = r.employee || '';
   document.getElementById('edit-outcome').value   = r.outcome  || '';
   document.getElementById('edit-followup').value  = r.follow_up_date || '';
-  document.getElementById('edit-notes').value     = r.notes    || '';
+  document.getElementById('edit-notes').value       = r.notes       || '';
+  document.getElementById('edit-next-action').value = r.next_action || '';
+  const empField = document.getElementById('edit-employee');
+  empField.readOnly = !IS_ADMIN();
+  empField.style.background = IS_ADMIN() ? '' : '#f5f5f5';
+  empField.style.color      = IS_ADMIN() ? '' : '#666';
   document.getElementById('edit-overlay').classList.add('open');
 }
 
@@ -498,6 +600,7 @@ document.getElementById('edit-save').addEventListener('click', async () => {
     outcome:         document.getElementById('edit-outcome').value,
     follow_up_date:  document.getElementById('edit-followup').value || null,
     notes:           document.getElementById('edit-notes').value.trim(),
+    next_action:     document.getElementById('edit-next-action').value.trim() || null,
     updated_at:      new Date().toISOString(),
     updated_by:      currentUser?.email || 'unknown',
   }).eq('id', id);
@@ -727,8 +830,10 @@ function render() {
   document.getElementById('result-count').textContent =
     `${filtered.length.toLocaleString()} result${filtered.length !== 1 ? 's' : ''}`;
 
-  const colspan = IS_ADMIN() ? 6 : 5;
-  document.getElementById('actions-header').style.display = IS_ADMIN() ? '' : 'none';
+  const currentName = getUserName(currentUser);
+  const userCanActOnAny = IS_ADMIN() || filtered.some(r => r.employee === currentName && !r.deleted_at);
+  const colspan = userCanActOnAny ? 6 : 5;
+  document.getElementById('actions-header').style.display = userCanActOnAny ? '' : 'none';
 
   const tbody = document.getElementById('tbody');
   if (!rows.length) {
@@ -752,16 +857,21 @@ function render() {
       ? `<br><span style="font-size:10px;color:#c0392b">Deleted by ${escHtml(r.deleted_by||'?')} · ${new Date(r.deleted_at).toLocaleDateString('en-GB')}</span>`
       : '';
 
-    const notes = r.notes ? `<span class="td-notes">${escHtml(r.notes)}</span>` : '<span style="color:#ccc">—</span>';
+    const notesPart = r.notes ? `<span class="td-notes">${escHtml(r.notes)}</span>` : '';
+    const nextPart  = r.next_action ? `<span style="color:#1a5276;font-size:11px;display:block;margin-top:3px">→ ${escHtml(r.next_action)}</span>` : '';
+    const notes = (notesPart || nextPart) ? `${notesPart}${nextPart}` : '<span style="color:#ccc">—</span>';
 
+    const isOwner = r.employee === currentName && !isDeleted;
     let actions = '';
-    if (IS_ADMIN()) {
-      actions = isDeleted
-        ? `<td style="white-space:nowrap"><button class="btn-edit" onclick="restoreContact('${r.id}')">Restore</button></td>`
-        : `<td style="white-space:nowrap">
-             <button class="btn-edit" onclick="openEdit('${r.id}')">Edit</button>
-             <button class="btn-del"  onclick="deleteContact('${r.id}')">Delete</button>
-           </td>`;
+    if (IS_ADMIN() && isDeleted) {
+      actions = `<td style="white-space:nowrap"><button class="btn-edit" onclick="restoreContact('${r.id}')">Restore</button></td>`;
+    } else if (IS_ADMIN() || isOwner) {
+      actions = `<td style="white-space:nowrap">
+                   <button class="btn-edit" onclick="openEdit('${r.id}')">Edit</button>
+                   <button class="btn-del"  onclick="deleteContact('${r.id}')">Delete</button>
+                 </td>`;
+    } else {
+      actions = '<td></td>';
     }
 
     return `<tr style="${rowStyle}">
@@ -816,8 +926,8 @@ document.querySelectorAll('thead th[data-col]').forEach(th => {
 
 /* ── Export CSV ────────────────────────────────────────────── */
 document.getElementById('export-btn').addEventListener('click', () => {
-  const cols = ['contacted_at','installer_name','employee','outcome','notes'];
-  const header = ['Date','Installer','Employee','Outcome','Notes'];
+  const cols = ['contacted_at','installer_name','employee','outcome','notes','next_action'];
+  const header = ['Date','Installer','Employee','Outcome','Notes','Next Action'];
   const rows   = filtered.map(r => cols.map(c => `"${(r[c]||'').toString().replace(/"/g,'""')}"`).join(','));
   const csv    = [header.join(','), ...rows].join('\n');
   const blob   = new Blob([csv], { type: 'text/csv' });
@@ -874,6 +984,119 @@ db.auth.onAuthStateChange((event, session) => {
     onAuthenticated(session.user);
     if (!allData.length) loadData();
   }
+});
+
+/* ── Log Contact from Dashboard ────────────────────────────── */
+let installersList = null;
+
+async function ensureInstallersList() {
+  if (installersList) return;
+  const r = await fetch('installers.json');
+  installersList = await r.json();
+}
+
+document.getElementById('open-log-btn').addEventListener('click', async () => {
+  await ensureInstallersList();
+  clearInstallerSelection();
+  document.getElementById('log-outcome').value       = '';
+  document.getElementById('log-notes').value         = '';
+  document.getElementById('log-next-action').value   = '';
+  document.getElementById('log-followup-date').value = '';
+  document.getElementById('log-followup-group').style.display = 'none';
+  document.getElementById('ins-search').value        = '';
+  document.getElementById('ins-results').style.display = 'none';
+  document.getElementById('log-overlay').classList.add('open');
+});
+
+document.getElementById('log-cancel').addEventListener('click', () => {
+  document.getElementById('log-overlay').classList.remove('open');
+});
+document.getElementById('log-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('log-overlay'))
+    document.getElementById('log-overlay').classList.remove('open');
+});
+
+document.getElementById('log-outcome').addEventListener('change', e => {
+  const group = document.getElementById('log-followup-group');
+  if (e.target.value === 'Follow Up') {
+    group.style.display = 'block';
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    document.getElementById('log-followup-date').value = tomorrow.toISOString().slice(0, 10);
+  } else {
+    group.style.display = 'none';
+  }
+});
+
+document.getElementById('ins-search').addEventListener('input', e => {
+  const term = e.target.value.toLowerCase().trim();
+  const results = document.getElementById('ins-results');
+  if (!term || !installersList) { results.style.display = 'none'; return; }
+  const matches = installersList
+    .filter(d => d.name.toLowerCase().includes(term) || (d.postcode || '').toLowerCase().includes(term))
+    .slice(0, 8);
+  if (!matches.length) { results.style.display = 'none'; return; }
+  results.innerHTML = matches.map(d =>
+    `<div class="ins-result" onclick="selectInstaller('${d.id}','${d.name.replace(/'/g,"\\'").replace(/"/g,"&quot;")}','${(d.postcode||'').replace(/'/g,"\\'")}')">
+      <strong>${escHtml(d.name)}</strong>
+      ${d.postcode ? `<span style="color:#999;margin-left:8px;font-size:11px">${escHtml(d.postcode)}</span>` : ''}
+    </div>`
+  ).join('');
+  results.style.display = 'block';
+});
+
+function selectInstaller(id, name, postcode) {
+  document.getElementById('log-installer-id').value    = id;
+  document.getElementById('log-installer-name-val').value = name;
+  document.getElementById('ins-selected-name').textContent = name + (postcode ? ` · ${postcode}` : '');
+  document.getElementById('ins-selected').style.display = 'flex';
+  document.getElementById('ins-search').style.display  = 'none';
+  document.getElementById('ins-results').style.display = 'none';
+}
+
+function clearInstallerSelection() {
+  document.getElementById('log-installer-id').value       = '';
+  document.getElementById('log-installer-name-val').value = '';
+  document.getElementById('ins-selected').style.display   = 'none';
+  document.getElementById('ins-search').style.display     = '';
+  document.getElementById('ins-search').value             = '';
+}
+
+document.getElementById('ins-clear').addEventListener('click', clearInstallerSelection);
+
+document.getElementById('log-submit').addEventListener('click', async () => {
+  const installerId   = document.getElementById('log-installer-id').value;
+  const installerName = document.getElementById('log-installer-name-val').value;
+  const outcome       = document.getElementById('log-outcome').value;
+  const notes         = document.getElementById('log-notes').value.trim();
+  const nextAction    = document.getElementById('log-next-action').value.trim();
+
+  if (!installerId)  { alert('Please select an installer.'); return; }
+  if (!outcome)      { alert('Please select an outcome.'); return; }
+
+  const followUpDate = outcome === 'Follow Up'
+    ? (document.getElementById('log-followup-date').value || null)
+    : null;
+
+  const btn = document.getElementById('log-submit');
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  const { error } = await db.from('contacts').insert([{
+    installer_id:   installerId,
+    installer_name: installerName,
+    employee:       getUserName(currentUser),
+    employee_email: currentUser?.email || null,
+    outcome,
+    notes:          notes || null,
+    next_action:    nextAction || null,
+    follow_up_date: followUpDate,
+  }]);
+
+  btn.disabled = false; btn.textContent = 'Save Contact';
+
+  if (error) { alert('Failed to save: ' + error.message); return; }
+  document.getElementById('log-overlay').classList.remove('open');
+  await loadData();
 });
 </script>
 </body>
