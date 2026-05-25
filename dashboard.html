@@ -328,7 +328,7 @@
       .btn-apply, .btn-clear { flex: 1; }
       .table-header { flex-direction: column; align-items: flex-start; }
       .table-wrap { overflow-x: auto; }
-      table { min-width: 560px; }
+      table { min-width: 720px; }
     }
     @media (max-width: 480px) {
       .cards { grid-template-columns: 1fr 1fr; }
@@ -490,11 +490,12 @@
           <th data-col="employee">Employee</th>
           <th data-col="outcome">Outcome</th>
           <th>Notes</th>
+          <th>Next action</th>
           <th id="actions-header" style="display:none"></th>
         </tr>
       </thead>
       <tbody id="tbody">
-        <tr class="state-row"><td colspan="5">Loading…</td></tr>
+        <tr class="state-row"><td colspan="6">Loading…</td></tr>
       </tbody>
     </table>
     <div class="pagination" id="pagination"></div>
@@ -1051,7 +1052,7 @@ function render() {
 
   const tbody = document.getElementById('tbody');
   if (!rows.length) {
-    tbody.innerHTML = `<tr class="state-row"><td colspan="${userCanActOnAny ? 6 : 5}">No contacts match the current filters.</td></tr>`;
+    tbody.innerHTML = `<tr class="state-row"><td colspan="${userCanActOnAny ? 7 : 6}">No contacts match the current filters.</td></tr>`;
     document.getElementById('pagination').innerHTML = '';
     return;
   }
@@ -1067,9 +1068,8 @@ function render() {
     const rowStyle  = isDeleted ? 'opacity:0.55;background:var(--alertSoft);' : '';
     const editedBadge  = r.updated_at ? `<div class="meta-badge">Edited by ${escHtml(r.updated_by||'?')} · ${new Date(r.updated_at).toLocaleDateString('en-GB')}</div>` : '';
     const deletedBadge = isDeleted    ? `<div class="meta-badge deleted">Deleted by ${escHtml(r.deleted_by||'?')} · ${new Date(r.deleted_at).toLocaleDateString('en-GB')}</div>` : '';
-    const notesPart = r.notes       ? `<span class="td-notes">${escHtml(r.notes)}</span>` : '';
-    const nextPart  = r.next_action ? `<div style="color:var(--accentDk);font-size:11.5px;margin-top:4px">→ ${escHtml(r.next_action)}</div>` : '';
-    const notes = (notesPart||nextPart) ? `${notesPart}${nextPart}` : '<span style="color:var(--text3)">—</span>';
+    const notes = r.notes       ? `<span class="td-notes">${escHtml(r.notes)}</span>` : '<span style="color:var(--text3)">—</span>';
+    const next  = r.next_action ? `<span class="td-notes" style="color:var(--accentDk)">→ ${escHtml(r.next_action)}</span>` : '<span style="color:var(--text3)">—</span>';
     const isOwner = r.employee === currentName && !isDeleted;
     let actions = '';
     if (IS_ADMIN() && isDeleted)   actions = `<td style="white-space:nowrap"><button class="btn-edit" onclick="restoreContact('${r.id}')">Restore</button></td>`;
@@ -1082,6 +1082,7 @@ function render() {
       <td style="color:var(--text2)">${escHtml(r.employee)}</td>
       <td><span class="outcome-pill" style="background:${soft};color:${color}"><span class="pill-dot" style="background:${color}"></span>${escHtml(label)}</span></td>
       <td>${notes}</td>
+      <td>${next}</td>
       ${actions}
     </tr>`;
   }).join('');
