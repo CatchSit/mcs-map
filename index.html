@@ -860,6 +860,18 @@
   </div>
 
   <div class="section">
+    <h3>Pipeline</h3>
+    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#000"></span>Not contacted</span><span class="stat-n" id="stat-none">–</span></div>
+    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:var(--status-noanswer-c)"></span>No answer</span><span class="stat-n" id="stat-noanswer">–</span></div>
+    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:var(--status-interested-c)"></span>Interested</span><span class="stat-n" id="stat-interested">–</span></div>
+    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:var(--status-followup-c)"></span>Follow up</span><span class="stat-n" id="stat-followup">–</span></div>
+    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:var(--status-converted-c)"></span>Converted</span><span class="stat-n" id="stat-converted">–</span></div>
+    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:var(--status-existing-c)"></span>Existing customer</span><span class="stat-n" id="stat-existing">–</span></div>
+    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:var(--status-notint-c)"></span>Not interested</span><span class="stat-n" id="stat-notinterested">–</span></div>
+    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:var(--status-removed-c)"></span>Removed from MCS</span><span class="stat-n" id="stat-removed">–</span></div>
+  </div>
+
+  <div class="section">
     <h3>Technology</h3>
     <div id="tech-list"></div>
   </div>
@@ -871,21 +883,13 @@
       <div class="switch"><input type="checkbox" id="bus-toggle"/><span class="slider"></span></div>
     </label>
     <label class="toggle-row">
+      <span class="lbl">Cluster nearby markers</span>
+      <div class="switch"><input type="checkbox" id="cluster-toggle" checked/><span class="slider"></span></div>
+    </label>
+    <label class="toggle-row">
       <span class="lbl">50-mile delivery radius</span>
       <div class="switch"><input type="checkbox" id="radius-toggle"/><span class="slider"></span></div>
     </label>
-  </div>
-
-  <div class="section">
-    <h3>Pipeline</h3>
-    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#000"></span>Not contacted</span><span class="stat-n" id="stat-none">–</span></div>
-    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:var(--status-noanswer-c)"></span>No answer</span><span class="stat-n" id="stat-noanswer">–</span></div>
-    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:var(--status-interested-c)"></span>Interested</span><span class="stat-n" id="stat-interested">–</span></div>
-    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:var(--status-followup-c)"></span>Follow up</span><span class="stat-n" id="stat-followup">–</span></div>
-    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:var(--status-converted-c)"></span>Converted</span><span class="stat-n" id="stat-converted">–</span></div>
-    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:var(--status-existing-c)"></span>Existing customer</span><span class="stat-n" id="stat-existing">–</span></div>
-    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:var(--status-notint-c)"></span>Not interested</span><span class="stat-n" id="stat-notinterested">–</span></div>
-    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:var(--status-removed-c)"></span>Removed from MCS</span><span class="stat-n" id="stat-removed">–</span></div>
   </div>
 
   <button id="reset">Reset filters</button>
@@ -1112,13 +1116,16 @@ const cluster = L.markerClusterGroup({
 });
 map.addLayer(cluster);
 
+const unclusteredLayer = L.layerGroup();
+
 /* ── State ───────────────────────────────────────────────── */
-let allMarkers   = [];
-let contactMap   = {};   // installer_id → [contacts]
-let activeTechs  = new Set(TECH_ORDER);
-let busOnly      = false;
-let searchTerm   = "";
-let statusFilter = "all";
+let allMarkers    = [];
+let contactMap    = {};   // installer_id → [contacts]
+let activeTechs   = new Set(TECH_ORDER);
+let busOnly       = false;
+let searchTerm    = "";
+let statusFilter  = "all";
+let clusterEnabled = true;
 
 /* ── Marker helpers ──────────────────────────────────────── */
 function latestContact(id) {
@@ -1273,6 +1280,7 @@ function buildTechList(data) {
 function applyFilters() {
   const term = searchTerm.toLowerCase();
   cluster.clearLayers();
+  unclusteredLayer.clearLayers();
   let shown = 0;
   allMarkers.forEach(m => {
     const d      = m._d;
@@ -1288,7 +1296,10 @@ function applyFilters() {
         ? !outcome
         : outcome === statusFilter;
 
-    if (techOk && busOk && searchOk && statusOk) { cluster.addLayer(m); shown++; }
+    if (techOk && busOk && searchOk && statusOk) {
+      clusterEnabled ? cluster.addLayer(m) : unclusteredLayer.addLayer(m);
+      shown++;
+    }
   });
   document.getElementById("shown").textContent = shown.toLocaleString();
 }
@@ -1494,22 +1505,39 @@ document.getElementById('sidebar-overlay').addEventListener('click', closeSideba
 document.getElementById("search").addEventListener("input", e => { searchTerm = e.target.value; applyFilters(); });
 document.getElementById("bus-toggle").addEventListener("change", e => { busOnly = e.target.checked; applyFilters(); });
 document.getElementById("status-filter").addEventListener("change", e => { statusFilter = e.target.value; applyFilters(); });
+document.getElementById("cluster-toggle").addEventListener("change", e => {
+  clusterEnabled = e.target.checked;
+  if (clusterEnabled) {
+    map.removeLayer(unclusteredLayer);
+    map.addLayer(cluster);
+  } else {
+    map.removeLayer(cluster);
+    map.addLayer(unclusteredLayer);
+  }
+  applyFilters();
+});
 document.getElementById("radius-toggle").addEventListener("change", e => {
   e.target.checked ? radiusCircle.addTo(map) : radiusCircle.remove();
 });
 
 document.getElementById("reset").addEventListener("click", () => {
-  activeTechs  = new Set(TECH_ORDER);
-  busOnly      = false;
-  searchTerm   = "";
-  statusFilter = "all";
-  document.getElementById("search").value        = "";
-  document.getElementById("bus-toggle").checked  = false;
-  document.getElementById("status-filter").value = "all";
+  activeTechs    = new Set(TECH_ORDER);
+  busOnly        = false;
+  searchTerm     = "";
+  statusFilter   = "all";
+  clusterEnabled = true;
+  document.getElementById("search").value          = "";
+  document.getElementById("bus-toggle").checked    = false;
+  document.getElementById("cluster-toggle").checked = true;
+  document.getElementById("status-filter").value   = "all";
   document.querySelectorAll("#tech-list input").forEach(cb => {
     cb.checked = true;
     cb.closest('.tech-chip').classList.add('on');
   });
+  if (!map.hasLayer(cluster)) {
+    map.removeLayer(unclusteredLayer);
+    map.addLayer(cluster);
+  }
   cluster.clearLayers();
   allMarkers.forEach(m => cluster.addLayer(m));
   updateCount();
