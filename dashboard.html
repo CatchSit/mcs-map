@@ -1184,7 +1184,7 @@ document.getElementById('f-from').value = monthStr;
 
 /* ── Auth callbacks ────────────────────────────────────────── */
 function onAuthenticated(user) {
-  if (!user.email?.toLowerCase().endsWith('@amcorenewables.co.uk')) {
+  if (!user.email?.toLowerCase().endsWith('@amcorenewables.co.uk') && !user.email?.toLowerCase().endsWith('@amcorenewables.com')) {
     db.auth.signOut();
     const err = document.getElementById('login-error');
     err.textContent = 'Access restricted to @amcorenewables.co.uk accounts.';
