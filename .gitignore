@@ -1,0 +1,5 @@
+# Claude Code internals
+.claude/
+
+# Graphify analysis outputs
+graphify-out/

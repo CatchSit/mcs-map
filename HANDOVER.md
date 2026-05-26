@@ -31,7 +31,13 @@ mcs-map/
 ├── dashboard.html                      # CRM/manager dashboard
 ├── installers.json                     # Installer data (refreshed daily)
 ├── HANDOVER.md                         # This file
+├── shared/
+│   └── status-config.js               # Contact outcome colours/labels (single source of truth)
 └── supabase/
+    ├── migrations/
+    │   ├── 001_contacts_schema.sql    # contacts table definition
+    │   ├── 002_contacts_rls.sql       # RLS policies
+    │   └── 003_cron_schedule.sql      # pg_cron follow-up digest schedule
     └── functions/
         └── send-followup-digest/
             └── index.ts                # Email digest Edge Function
@@ -131,7 +137,9 @@ Static data file. Array of installer objects:
 
 ## 4. Database Schema
 
-### `contacts` table
+Executable SQL lives in `supabase/migrations/` — that is the authoritative source. The table below is a human-readable summary.
+
+### `contacts` table (`supabase/migrations/001_contacts_schema.sql`)
 | Column | Type | Notes |
 |---|---|---|
 | `id` | uuid | Primary key |
@@ -264,7 +272,8 @@ No environment variables. No build process. All configuration is hardcoded in th
 | `SUPABASE_URL` | Auto-injected by Supabase runtime |
 | `SUPABASE_SERVICE_ROLE_KEY` | Auto-injected by Supabase runtime |
 
-**Supabase RLS policies on `contacts` table:**
+**Supabase RLS policies on `contacts` table** — see `supabase/migrations/002_contacts_rls.sql` for the full SQL.
+
 | Policy name | Command | Rule |
 |---|---|---|
 | Authenticated read | SELECT | Any authenticated user |
@@ -274,14 +283,7 @@ No environment variables. No build process. All configuration is hardcoded in th
 
 The `contacts_update_policy` uses `COALESCE(NULLIF(full_name,''), NULLIF(name,''), split_part(email,'@',1))` to match the employee name — must stay in sync with `getUserName()` in JS.
 
-**pg_cron schedule for follow-up digest:**
-```sql
-SELECT cron.schedule('send-followup-digest','0 7 * * 1-5',
-  $$SELECT net.http_post(url:='https://teezsldwkpwzgvfizial.supabase.co/functions/v1/send-followup-digest',
-    headers:='{"Authorization":"Bearer <anon_key>"}'::jsonb)$$
-);
-```
-Runs 7am UTC Mon–Fri (= 8am BST in summer, 7am GMT in winter).
+**pg_cron schedule for follow-up digest** — see `supabase/migrations/003_cron_schedule.sql` for the full SQL. Runs 7am UTC Mon–Fri (= 8am BST in summer, 7am GMT in winter).
 
 ---
 

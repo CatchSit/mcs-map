@@ -7,19 +7,35 @@ const SUPABASE_URL          = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const MAP_URL               = 'https://catchsit.github.io/mcs-map/index.html'
 
+if (!GMAIL_APP_PASSWORD || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  throw new Error('Missing required secret — check GMAIL_APP_PASSWORD, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY in Supabase secrets')
+}
+
+const db = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+
+const transporter = nodemailer.createTransport({
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true,
+  auth: {
+    user: GMAIL_USER,
+    pass: GMAIL_APP_PASSWORD,
+  },
+})
+
+// Full contacts schema (all columns):
+//   id, installer_id, installer_name, employee, employee_email,
+//   outcome, notes, next_action, follow_up_date, contacted_at,
+//   updated_at, updated_by, deleted_at, deleted_by
+interface Contact {
+  installer_name:  string
+  employee:        string
+  employee_email:  string
+  outcome:         string
+  notes:           string | null
+}
+
 Deno.serve(async () => {
-  const db = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-
-  const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
-    auth: {
-      user: GMAIL_USER,
-      pass: GMAIL_APP_PASSWORD,
-    },
-  })
-
   // Today's date in UK time (handles BST/GMT automatically)
   const ukToday = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' })
 
@@ -41,7 +57,7 @@ Deno.serve(async () => {
   }
 
   // Group by employee email
-  const byEmployee: Record<string, typeof contacts> = {}
+  const byEmployee: Record<string, Contact[]> = {}
   for (const c of contacts) {
     if (!byEmployee[c.employee_email]) byEmployee[c.employee_email] = []
     byEmployee[c.employee_email].push(c)
@@ -57,7 +73,7 @@ Deno.serve(async () => {
       const name  = items[0].employee
       const count = items.length
 
-      const tableRows = items.map((c: typeof contacts[0]) => `
+      const tableRows = items.map((c: Contact) => `
         <tr>
           <td style="padding:10px 12px;border-bottom:1px solid #eee;font-weight:bold;color:#1a5276">${esc(c.installer_name)}</td>
           <td style="padding:10px 12px;border-bottom:1px solid #eee">${esc(c.outcome)}</td>

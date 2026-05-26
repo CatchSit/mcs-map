@@ -956,6 +956,7 @@
         <label>Follow-up date <span class="required">*</span></label>
         <input type="date" id="modal-followup-date"/>
       </div>
+      <!-- min date set dynamically in JS when Follow Up is selected -->
 
       <label>Notes <span style="color:var(--text3); font-weight:400; font-size:11.5px">— optional</span></label>
       <textarea id="modal-notes" placeholder="What was said? Action items? Any sensitivities?"></textarea>
@@ -977,6 +978,8 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="shared/status-config.js"></script>
+<script src="shared/escape-html.js"></script>
 <script>
 
 /* ── Supabase ────────────────────────────────────────────── */
@@ -1044,6 +1047,8 @@ document.getElementById('sign-out-btn').addEventListener('click', async () => {
 db.auth.onAuthStateChange((event, session) => {
   if (session?.user) {
     onAuthenticated(session.user);
+  } else {
+    showLoginScreen();
   }
 });
 
@@ -1070,16 +1075,7 @@ function primaryColor(techs) {
   return "#7f8c8d";
 }
 
-/* ── Contact status config (Daylight palette) ────────────── */
-const STATUS = {
-  "Interested":        { color: "#5d8a64", soft: "#dde9da", label: "Interested" },
-  "Follow Up":         { color: "#c08438", soft: "#f3e3cb", label: "Follow up" },
-  "Converted":         { color: "#2f5a3d", soft: "#cee0d2", label: "Converted" },
-  "Existing Customer": { color: "#6f5b94", soft: "#e2dcec", label: "Existing customer" },
-  "Not Interested":    { color: "#8e9080", soft: "#ececdf", label: "Not interested" },
-  "No Answer":         { color: "#b9b9a9", soft: "#f0f0e6", label: "No answer" },
-  "Removed from MCS Database": { color: "#b85544", soft: "#f0d3ce", label: "Removed" },
-};
+/* ── Contact status config — loaded from shared/status-config.js ── */
 
 /* ── Map setup ───────────────────────────────────────────── */
 const map = L.map("map", { center: [54.5, -3.5], zoom: 6, zoomControl: false });
@@ -1131,7 +1127,7 @@ let clusterEnabled = true;
 function latestContact(id) {
   const list = contactMap[id];
   if (!list || !list.length) return null;
-  return list.reduce((a, b) => new Date(a.contacted_at) > new Date(b.contacted_at) ? a : b);
+  return list[0]; // loadContacts fetches ordered by contacted_at desc
 }
 
 // Build a pin-shape divIcon. Pin body = pipeline status color, or black
@@ -1189,9 +1185,7 @@ function buildContactHistory(id) {
     }).join('');
 }
 
-function escapeHtml(s) {
-  return (s||'').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-}
+/* escapeHtml — loaded from shared/escape-html.js */
 
 function buildPopup(d) {
   const latest = latestContact(d.id);
@@ -1327,6 +1321,9 @@ function updateContactStats() {
 }
 
 /* ── Load contacts from Supabase ─────────────────────────── */
+// contacts columns: id, installer_id, installer_name, employee, employee_email,
+//   outcome, notes, next_action, follow_up_date, contacted_at,
+//   updated_at, updated_by, deleted_at, deleted_by
 async function loadContacts() {
   const { data, error } = await db.from('contacts').select('*').order('contacted_at', { ascending: false });
   if (error) { console.warn('Could not load contacts:', error); return; }
@@ -1404,10 +1401,13 @@ document.getElementById('modal-outcome').addEventListener('change', e => {
   const group = document.getElementById('followup-date-group');
   if (e.target.value === 'Follow Up') {
     group.style.display = 'block';
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 7);
-    if (!document.getElementById('modal-followup-date').value) {
-      document.getElementById('modal-followup-date').value = tomorrow.toISOString().slice(0, 10);
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const input = document.getElementById('modal-followup-date');
+    input.min = todayStr;
+    if (!input.value) {
+      const sevenDays = new Date();
+      sevenDays.setDate(sevenDays.getDate() + 7);
+      input.value = sevenDays.toISOString().slice(0, 10);
     }
   } else {
     group.style.display = 'none';

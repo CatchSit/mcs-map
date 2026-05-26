@@ -626,6 +626,8 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script src="shared/status-config.js"></script>
+<script src="shared/escape-html.js"></script>
 <script>
 const { createClient } = supabase;
 const db = createClient(
@@ -633,33 +635,10 @@ const db = createClient(
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRlZXpzbGR3a3B3emd2Zml6aWFsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5NzUxMjAsImV4cCI6MjA5NDU1MTEyMH0.8rRoiHuS98HZp4jHSYbL31J3O9fn36tKEy9ooosPoGU'
 );
 
-const OUTCOME_COLORS = {
-  "Interested":                "#5d8a64",
-  "Follow Up":                 "#c08438",
-  "Converted":                 "#2f5a3d",
-  "Existing Customer":         "#6f5b94",
-  "Not Interested":            "#8e9080",
-  "No Answer":                 "#b9b9a9",
-  "Removed from MCS Database": "#b85544",
-};
-const OUTCOME_SOFTS = {
-  "Interested":                "#dde9da",
-  "Follow Up":                 "#f3e3cb",
-  "Converted":                 "#cee0d2",
-  "Existing Customer":         "#e2dcec",
-  "Not Interested":            "#ececdf",
-  "No Answer":                 "#f0f0e6",
-  "Removed from MCS Database": "#f0d3ce",
-};
-const OUTCOME_LABELS = {
-  "Interested":                "Interested",
-  "Follow Up":                 "Follow up",
-  "Converted":                 "Converted",
-  "Existing Customer":         "Existing customer",
-  "Not Interested":            "Not interested",
-  "No Answer":                 "No answer",
-  "Removed from MCS Database": "Removed",
-};
+/* ── Outcome maps derived from shared/status-config.js ── */
+const OUTCOME_COLORS = Object.fromEntries(Object.entries(STATUS).map(([k, v]) => [k, v.color]));
+const OUTCOME_SOFTS  = Object.fromEntries(Object.entries(STATUS).map(([k, v]) => [k, v.soft]));
+const OUTCOME_LABELS = Object.fromEntries(Object.entries(STATUS).map(([k, v]) => [k, v.label]));
 
 const PERIOD_META = {
   today: 'today',
@@ -738,13 +717,20 @@ function periodData() {
 function updateCards() {
   const pd = periodData();
 
+  // Latest pipeline status per installer (allData is already sorted contacted_at desc)
+  const latest = {};
+  allData.filter(r => !r.deleted_at).forEach(c => {
+    if (!latest[c.installer_id]) latest[c.installer_id] = c.outcome;
+  });
+  const latestOutcomes = Object.values(latest);
+
   // Contacts made in period
   document.getElementById('c-contacts').textContent = pd.length;
   document.getElementById('c-contacts-sub').textContent = PERIOD_META[activePeriod];
 
-  // Open follow-ups (current state, not period filtered)
+  // Open follow-ups: installers whose LATEST contact is "Follow Up"
   document.getElementById('c-followups').textContent =
-    allData.filter(r => !r.deleted_at && r.outcome === 'Follow Up').length;
+    latestOutcomes.filter(o => o === 'Follow Up').length;
 
   // Coverage: unique installers ever contacted / total
   const uniqueContacted = new Set(allData.filter(r => !r.deleted_at).map(r => r.installer_id)).size;
@@ -758,17 +744,17 @@ function updateCards() {
     document.getElementById('c-coverage-sub').textContent = 'installers contacted';
   }
 
-  // Not interested: latest pipeline status per installer
-  const latest = {};
-  [...allData].filter(r => !r.deleted_at)
-    .sort((a,b) => new Date(b.contacted_at) - new Date(a.contacted_at))
-    .forEach(c => { if (!latest[c.installer_id]) latest[c.installer_id] = c.outcome; });
+  // Not interested: installers whose LATEST contact is "Not Interested"
   document.getElementById('c-not').textContent =
-    Object.values(latest).filter(o => o === 'Not Interested').length;
+    latestOutcomes.filter(o => o === 'Not Interested').length;
 }
 
 function updateFollowupsCount() {
-  const count = allData.filter(r => !r.deleted_at && r.outcome === 'Follow Up').length;
+  const latest = {};
+  allData.filter(r => !r.deleted_at).forEach(c => {
+    if (!latest[c.installer_id]) latest[c.installer_id] = c.outcome;
+  });
+  const count = Object.values(latest).filter(o => o === 'Follow Up').length;
   const badge = document.getElementById('nav-followups-count');
   if (!badge) return;
   badge.textContent = count;
@@ -784,7 +770,9 @@ async function loadInstallerCount() {
     installersList = data;
     totalInstallerCount = data.length;
     updateCards();
-  } catch(e) {}
+  } catch(e) {
+    console.warn('Failed to load installers.json — coverage card will show raw count:', e);
+  }
 }
 
 /* ── Charts ────────────────────────────────────────────────── */
@@ -985,6 +973,9 @@ async function restoreContact(id) {
 }
 
 /* ── Data loading ──────────────────────────────────────────── */
+// contacts columns: id, installer_id, installer_name, employee, employee_email,
+//   outcome, notes, next_action, follow_up_date, contacted_at,
+//   updated_at, updated_by, deleted_at, deleted_by
 async function loadData() {
   let query = db.from('contacts').select('*').order('contacted_at', { ascending: false });
   if (!showDeleted) query = query.is('deleted_at', null);
@@ -1066,10 +1057,10 @@ function render() {
     const label    = OUTCOME_LABELS[r.outcome] || r.outcome;
     const isDeleted = !!r.deleted_at;
     const rowStyle  = isDeleted ? 'opacity:0.55;background:var(--alertSoft);' : '';
-    const editedBadge  = r.updated_at ? `<div class="meta-badge">Edited by ${escHtml(r.updated_by||'?')} · ${new Date(r.updated_at).toLocaleDateString('en-GB')}</div>` : '';
-    const deletedBadge = isDeleted    ? `<div class="meta-badge deleted">Deleted by ${escHtml(r.deleted_by||'?')} · ${new Date(r.deleted_at).toLocaleDateString('en-GB')}</div>` : '';
-    const notes = r.notes       ? `<span class="td-notes">${escHtml(r.notes)}</span>` : '<span style="color:var(--text3)">—</span>';
-    const next  = r.next_action ? `<span class="td-notes" style="color:var(--accentDk)">→ ${escHtml(r.next_action)}</span>` : '<span style="color:var(--text3)">—</span>';
+    const editedBadge  = r.updated_at ? `<div class="meta-badge">Edited by ${escapeHtml(r.updated_by||'?')} · ${new Date(r.updated_at).toLocaleDateString('en-GB')}</div>` : '';
+    const deletedBadge = isDeleted    ? `<div class="meta-badge deleted">Deleted by ${escapeHtml(r.deleted_by||'?')} · ${new Date(r.deleted_at).toLocaleDateString('en-GB')}</div>` : '';
+    const notes = r.notes       ? `<span class="td-notes">${escapeHtml(r.notes)}</span>` : '<span style="color:var(--text3)">—</span>';
+    const next  = r.next_action ? `<span class="td-notes" style="color:var(--accentDk)">→ ${escapeHtml(r.next_action)}</span>` : '<span style="color:var(--text3)">—</span>';
     const isOwner = r.employee === currentName && !isDeleted;
     let actions = '';
     if (IS_ADMIN() && isDeleted)   actions = `<td style="white-space:nowrap"><button class="btn-edit" onclick="restoreContact('${r.id}')">Restore</button></td>`;
@@ -1078,9 +1069,9 @@ function render() {
 
     return `<tr style="${rowStyle}">
       <td style="white-space:nowrap">${dateStr}<div style="color:var(--text3);font-size:11.5px;margin-top:2px">${timeStr}</div>${deletedBadge}${editedBadge}</td>
-      <td class="td-name">${escHtml(r.installer_name||'—')}</td>
-      <td style="color:var(--text2)">${escHtml(r.employee)}</td>
-      <td><span class="outcome-pill" style="background:${soft};color:${color}"><span class="pill-dot" style="background:${color}"></span>${escHtml(label)}</span></td>
+      <td class="td-name">${escapeHtml(r.installer_name||'—')}</td>
+      <td style="color:var(--text2)">${escapeHtml(r.employee)}</td>
+      <td><span class="outcome-pill" style="background:${soft};color:${color}"><span class="pill-dot" style="background:${color}"></span>${escapeHtml(label)}</span></td>
       <td>${notes}</td>
       <td>${next}</td>
       ${actions}
@@ -1089,7 +1080,7 @@ function render() {
   renderPagination();
 }
 
-function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+/* escapeHtml — loaded from shared/escape-html.js */
 
 /* ── Pagination ────────────────────────────────────────────── */
 function renderPagination() {
@@ -1252,7 +1243,7 @@ document.getElementById('ins-search').addEventListener('input', e => {
   if (!matches.length) { results.style.display = 'none'; return; }
   results.innerHTML = matches.map(d =>
     `<div class="ins-result" onclick="selectInstaller('${d.id}','${d.name.replace(/'/g,"\\'").replace(/"/g,"&quot;")}','${(d.postcode||'').replace(/'/g,"\\'")}')">
-      <strong>${escHtml(d.name)}</strong>${d.postcode ? `<span class="pc">${escHtml(d.postcode)}</span>` : ''}
+      <strong>${escapeHtml(d.name)}</strong>${d.postcode ? `<span class="pc">${escapeHtml(d.postcode)}</span>` : ''}
     </div>`
   ).join('');
   results.style.display = 'block';
