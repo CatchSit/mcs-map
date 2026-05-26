@@ -237,6 +237,14 @@ document.getElementById('sign-out-btn').addEventListener('click', async () => {
 });
 
 function onAuthenticated(user) {
+  if (!user.email?.toLowerCase().endsWith('@amcorenewables.co.uk')) {
+    db.auth.signOut();
+    const err = document.getElementById('login-error');
+    err.textContent = 'Access restricted to @amcorenewables.co.uk accounts.';
+    err.style.display = 'block';
+    document.getElementById('login-screen').classList.add('visible');
+    return;
+  }
   currentUser = user;
   document.getElementById('login-screen').classList.remove('visible');
   const name = getUserName(user);

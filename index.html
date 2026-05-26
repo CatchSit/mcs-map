@@ -1030,6 +1030,14 @@ function getInitials(name) {
 }
 
 function onAuthenticated(user) {
+  if (!user.email?.toLowerCase().endsWith('@amcorenewables.co.uk')) {
+    db.auth.signOut();
+    const err = document.getElementById('login-error');
+    err.textContent = 'Access restricted to @amcorenewables.co.uk accounts.';
+    err.style.display = 'block';
+    showLoginScreen();
+    return;
+  }
   currentUser = user;
   hideLoginScreen();
   const name = getUserName(user);
