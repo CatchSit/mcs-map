@@ -361,7 +361,7 @@
       </svg>
     </a>
     <!-- Follow-ups badge -->
-    <a href="dashboard.html" class="nav-followups-btn" title="Open follow-ups">
+    <a href="followups.html" class="nav-followups-btn" title="Open follow-ups">
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
         <circle cx="8" cy="8" r="6.5"/>
         <polyline points="8,4.5 8,8 10.5,9.5"/>
@@ -464,6 +464,10 @@
       <label>Search installer</label>
       <input type="text" id="f-search" placeholder="Name…"/>
     </div>
+    <div class="filter-group">
+      <label>Search notes</label>
+      <input type="text" id="f-notes" placeholder="Keywords in notes…"/>
+    </div>
     <div class="filter-actions">
       <button class="btn-clear" id="btn-clear">Clear</button>
       <button class="btn-apply" id="btn-apply">Apply</button>
@@ -489,13 +493,14 @@
           <th data-col="installer_name">Installer</th>
           <th data-col="employee">Employee</th>
           <th data-col="outcome">Outcome</th>
+          <th data-col="follow_up_date">Follow-up ↕</th>
           <th>Notes</th>
           <th>Next action</th>
           <th id="actions-header" style="display:none"></th>
         </tr>
       </thead>
       <tbody id="tbody">
-        <tr class="state-row"><td colspan="6">Loading…</td></tr>
+        <tr class="state-row"><td colspan="7">Loading…</td></tr>
       </tbody>
     </table>
     <div class="pagination" id="pagination"></div>
@@ -1010,6 +1015,7 @@ function applyFilters() {
   const employee = document.getElementById('f-employee').value;
   const outcome  = document.getElementById('f-outcome').value;
   const search   = document.getElementById('f-search').value.toLowerCase();
+  const notes    = document.getElementById('f-notes').value.toLowerCase();
   filtered = allData.filter(r => {
     const date = r.contacted_at.slice(0,10);
     if (from && date < from) return false;
@@ -1017,6 +1023,7 @@ function applyFilters() {
     if (employee && r.employee !== employee) return false;
     if (outcome  && r.outcome  !== outcome)  return false;
     if (search   && !(r.installer_name||'').toLowerCase().includes(search)) return false;
+    if (notes    && !(r.notes||'').toLowerCase().includes(notes)) return false;
     return true;
   });
   sortData();
@@ -1043,7 +1050,7 @@ function render() {
 
   const tbody = document.getElementById('tbody');
   if (!rows.length) {
-    tbody.innerHTML = `<tr class="state-row"><td colspan="${userCanActOnAny ? 7 : 6}">No contacts match the current filters.</td></tr>`;
+    tbody.innerHTML = `<tr class="state-row"><td colspan="${userCanActOnAny ? 8 : 7}">No contacts match the current filters.</td></tr>`;
     document.getElementById('pagination').innerHTML = '';
     return;
   }
@@ -1062,6 +1069,19 @@ function render() {
     const notes = r.notes       ? `<span class="td-notes">${escapeHtml(r.notes)}</span>` : '<span style="color:var(--text3)">—</span>';
     const next  = r.next_action ? `<span class="td-notes" style="color:var(--accentDk)">→ ${escapeHtml(r.next_action)}</span>` : '<span style="color:var(--text3)">—</span>';
     const isOwner = r.employee === currentName && !isDeleted;
+    // Feature 14: inline follow-up date edit for Follow Up rows
+    let followupCell = '<td style="color:var(--text3)">—</td>';
+    if (r.outcome === 'Follow Up') {
+      const today = new Date().toISOString().slice(0,10);
+      const isOverdue = r.follow_up_date && r.follow_up_date < today;
+      const canEdit = (IS_ADMIN() || isOwner) && !isDeleted;
+      if (canEdit) {
+        followupCell = `<td><input type="date" class="inline-date-input" data-id="${r.id}" value="${r.follow_up_date||''}" title="Click to change follow-up date" style="border:1px solid var(--border);border-radius:6px;padding:4px 7px;font-size:12px;font-family:inherit;background:var(--surface2);color:${isOverdue?'var(--alert)':'var(--warn)'};cursor:pointer;outline:none"/></td>`;
+      } else {
+        const displayDate = r.follow_up_date ? new Date(r.follow_up_date + 'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : '—';
+        followupCell = `<td style="color:${isOverdue?'var(--alert)':'var(--warn)'};font-size:12.5px;white-space:nowrap">${isOverdue?'⚠ ':''}${displayDate}</td>`;
+      }
+    }
     let actions = '';
     if (IS_ADMIN() && isDeleted)   actions = `<td style="white-space:nowrap"><button class="btn-edit" onclick="restoreContact('${r.id}')">Restore</button></td>`;
     else if (IS_ADMIN() || isOwner) actions = `<td style="white-space:nowrap"><button class="btn-edit" onclick="openEdit('${r.id}')">Edit</button><button class="btn-del" onclick="deleteContact('${r.id}')">Delete</button></td>`;
@@ -1072,11 +1092,29 @@ function render() {
       <td class="td-name">${escapeHtml(r.installer_name||'—')}</td>
       <td style="color:var(--text2)">${escapeHtml(r.employee)}</td>
       <td><span class="outcome-pill" style="background:${soft};color:${color}"><span class="pill-dot" style="background:${color}"></span>${escapeHtml(label)}</span></td>
+      ${followupCell}
       <td>${notes}</td>
       <td>${next}</td>
       ${actions}
     </tr>`;
   }).join('');
+
+  // Feature 14: wire up inline date inputs after render
+  document.querySelectorAll('.inline-date-input').forEach(inp => {
+    inp.addEventListener('change', async () => {
+      const id  = inp.dataset.id;
+      const val = inp.value || null;
+      const { error } = await db.from('contacts').update({
+        follow_up_date: val,
+        updated_at: new Date().toISOString(),
+        updated_by: currentUser?.email || 'unknown',
+      }).eq('id', id);
+      if (error) { showToast('Failed to update date'); inp.value = allData.find(r => r.id === id)?.follow_up_date || ''; return; }
+      const rec = allData.find(r => r.id === id);
+      if (rec) rec.follow_up_date = val;
+      showToast('Follow-up date updated');
+    });
+  });
   renderPagination();
 }
 
@@ -1128,12 +1166,13 @@ document.getElementById('export-btn').addEventListener('click', () => {
 /* ── Filter controls ───────────────────────────────────────── */
 document.getElementById('btn-apply').addEventListener('click', () => { page = 1; applyFilters(); });
 document.getElementById('btn-clear').addEventListener('click', () => {
-  ['f-from','f-to','f-search'].forEach(id => document.getElementById(id).value = '');
+  ['f-from','f-to','f-search','f-notes'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('f-employee').value = '';
   document.getElementById('f-outcome').value  = '';
   page = 1; applyFilters();
 });
 document.getElementById('f-search').addEventListener('keydown', e => { if (e.key === 'Enter') applyFilters(); });
+document.getElementById('f-notes').addEventListener('input', () => { page = 1; applyFilters(); });
 document.getElementById('f-employee').addEventListener('change', () => { page = 1; applyFilters(); });
 document.getElementById('f-outcome').addEventListener('change',  () => { page = 1; applyFilters(); });
 

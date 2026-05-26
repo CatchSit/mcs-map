@@ -458,6 +458,16 @@
     }
     .popup-facts p { padding: 5px 0; }
     .popup-facts p a { color: var(--accent); }
+    @media (max-width: 768px) {
+      .call-link {
+        display: inline-flex; align-items: center; gap: 8px;
+        background: var(--accent); color: #fff !important;
+        padding: 10px 16px; border-radius: 10px;
+        font-weight: 600; font-size: 14px;
+        text-decoration: none !important;
+      }
+      .call-link:hover { filter: brightness(1.05); }
+    }
     .cert-line { margin-top: 6px; font-size: 11px; color: var(--text3); }
 
     .contact-section {
@@ -657,6 +667,7 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     @keyframes dayFadeIn { from { opacity: 0; } to { opacity: 1; } }
     @keyframes daySlideIn { from { transform: translateY(8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    @keyframes overduePulse { 0%,100% { transform: scale(1); opacity: 0.85; } 50% { transform: scale(1.3); opacity: 0.4; } }
 
     /* ── Login ────────────────────────────────────────────── */
     #login-screen {
@@ -775,7 +786,7 @@
       </svg>
     </a>
     <!-- Follow-ups badge -->
-    <a href="dashboard.html" class="nav-followups-btn" title="Open follow-ups">
+    <a href="followups.html" class="nav-followups-btn" title="Open follow-ups">
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
         <circle cx="8" cy="8" r="6.5"/>
         <polyline points="8,4.5 8,8 10.5,9.5"/>
@@ -861,6 +872,7 @@
 
   <div class="section">
     <h3>Pipeline</h3>
+    <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:var(--alert)"></span>Overdue follow-ups</span><span class="stat-n" id="stat-overdue" style="color:var(--alert)">–</span></div>
     <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:#000"></span>Not contacted</span><span class="stat-n" id="stat-none">–</span></div>
     <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:var(--status-noanswer-c)"></span>No answer</span><span class="stat-n" id="stat-noanswer">–</span></div>
     <div class="stat-row"><span class="stat-label"><span class="stat-dot" style="background:var(--status-interested-c)"></span>Interested</span><span class="stat-n" id="stat-interested">–</span></div>
@@ -889,6 +901,10 @@
     <label class="toggle-row">
       <span class="lbl">50-mile delivery radius</span>
       <div class="switch"><input type="checkbox" id="radius-toggle"/><span class="slider"></span></div>
+    </label>
+    <label class="toggle-row">
+      <span class="lbl">Contact activity heatmap</span>
+      <div class="switch"><input type="checkbox" id="heat-toggle"/><span class="slider"></span></div>
     </label>
   </div>
 
@@ -977,6 +993,7 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="shared/status-config.js"></script>
 <script src="shared/escape-html.js"></script>
@@ -1122,6 +1139,7 @@ let busOnly       = false;
 let searchTerm    = "";
 let statusFilter  = "all";
 let clusterEnabled = true;
+let heatLayer     = null;
 
 /* ── Marker helpers ──────────────────────────────────────── */
 function latestContact(id) {
@@ -1132,9 +1150,16 @@ function latestContact(id) {
 
 // Build a pin-shape divIcon. Pin body = pipeline status color, or black
 // when uncontacted (matching the "Not contacted" pipeline status colour).
+function isOverdue(latest) {
+  if (!latest || latest.outcome !== 'Follow Up' || !latest.follow_up_date) return false;
+  const today = new Date().toISOString().slice(0, 10);
+  return latest.follow_up_date < today;
+}
+
 function makeMarkerIcon(d, latest) {
   const statusC = latest && STATUS[latest.outcome] ? STATUS[latest.outcome].color : null;
   const color   = statusC || '#000000';
+  const overdue = isOverdue(latest);
   const size    = 16;            // pin head width
   const height  = Math.round(size * 1.45);
   // Teardrop path: rounded head, pointed tail at bottom-center.
@@ -1143,7 +1168,11 @@ function makeMarkerIcon(d, latest) {
   const body = `<div style="width:${size}px;height:${height}px;background:${color};clip-path:path('${path}');filter:drop-shadow(0 2px 3px rgba(0,0,0,.28));"></div>`;
   // White core at the pin's head
   const core = `<div style="position:absolute;top:${Math.round(size*0.3)}px;left:50%;transform:translateX(-50%);width:${Math.round(size*0.36)}px;height:${Math.round(size*0.36)}px;border-radius:50%;background:#fff;box-shadow:inset 0 0 0 1px rgba(0,0,0,.08);"></div>`;
-  const html = `<div class="day-marker" style="position:relative;width:${size}px;height:${height}px;">${body}${core}</div>`;
+  // Overdue ring: pulsing red halo behind the pin
+  const ring = overdue
+    ? `<div style="position:absolute;top:-5px;left:-5px;width:${size+10}px;height:${size+10}px;border-radius:50%;border:2px solid #b85544;opacity:0.85;animation:overduePulse 1.6s ease-in-out infinite;"></div>`
+    : '';
+  const html = `<div class="day-marker" style="position:relative;width:${size}px;height:${height}px;">${ring}${body}${core}</div>`;
   // Anchor the pin's tip (bottom-center) to the latlng so it visually
   // "sits" on the location like a real map pin.
   return L.divIcon({ html, className: '', iconSize: [size, height], iconAnchor: [size/2, height] });
@@ -1187,6 +1216,12 @@ function buildContactHistory(id) {
 
 /* escapeHtml — loaded from shared/escape-html.js */
 
+function daysAgo(dateStr) {
+  if (!dateStr) return null;
+  const diff = Date.now() - new Date(dateStr).getTime();
+  return Math.floor(diff / 86400000);
+}
+
 function buildPopup(d) {
   const latest = latestContact(d.id);
   const cfg = latest && STATUS[latest.outcome] ? STATUS[latest.outcome] : null;
@@ -1195,7 +1230,9 @@ function buildPopup(d) {
     : `<span class="status-pill" style="background:var(--surface2);color:var(--text3)"><span class="pill-dot" style="background:var(--text3)"></span>Not contacted</span>`;
   const bus   = d.bus ? '<span class="bus-pill">BUS</span>' : '';
   const tags  = d.techs.map(t => `<span class="tag"><span class="tag-dot" style="background:${TECHS[t]||'#555'}"></span>${t}</span>`).join('');
-  const phone = d.phone   ? `<p>📞 <a href="tel:${d.phone}">${d.phone}</a></p>` : '';
+  const phone = d.phone
+    ? `<p>📞 <a href="tel:${d.phone}" class="call-link">${d.phone}</a></p>`
+    : '';
   const email = d.email   ? `<p>✉ <a href="mailto:${d.email}">${escapeHtml(d.email)}</a></p>` : '';
   const site  = d.website ? `<p>🌐 <a href="${d.website}" target="_blank" rel="noopener">${escapeHtml(d.website.replace(/^https?:\/\//,''))}</a></p>` : '';
   const maps  = d.postcode
@@ -1206,12 +1243,33 @@ function buildPopup(d) {
   const region = d.postcode ? `Postcode ${escapeHtml(d.postcode)}` : '';
   const logs = contactMap[d.id] || [];
 
+  // Feature 13: "Last contacted X days ago"
+  const days = latest ? daysAgo(latest.contacted_at) : null;
+  const lastContactedStr = days === null ? ''
+    : days === 0 ? '<span style="color:var(--accent);font-size:12px;font-weight:500">Contacted today</span>'
+    : days === 1 ? '<span style="color:var(--text2);font-size:12px">Last contacted yesterday</span>'
+    : `<span style="color:var(--text2);font-size:12px">Last contacted ${days} days ago</span>`;
+
+  // Feature 3: duplicate contact warning (another team member in last 7 days)
+  const myName = currentUser ? getUserName(currentUser) : null;
+  const recentByOthers = logs.filter(c => {
+    if (!c.contacted_at) return false;
+    if (myName && c.employee === myName) return false;
+    return daysAgo(c.contacted_at) <= 7;
+  });
+  const dupWarning = recentByOthers.length > 0
+    ? `<div style="margin:8px 0 2px;padding:8px 11px;background:var(--warnSoft);border:1px solid var(--warn);border-radius:8px;font-size:12px;color:var(--warn);display:flex;align-items:center;gap:7px">
+        <span>⚠</span><span><strong>${escapeHtml(recentByOthers[0].employee)}</strong> contacted this installer ${daysAgo(recentByOthers[0].contacted_at)} day${daysAgo(recentByOthers[0].contacted_at) === 1 ? '' : 's'} ago</span>
+       </div>`
+    : '';
+
   return `
     <div class="popup">
       <div class="popup-header">
         <div class="popup-eyebrow">Installer</div>
         <div class="popup-name">${escapeHtml(d.name)} ${bus}</div>
         ${region ? `<div class="popup-meta">${region}</div>` : ''}
+        ${lastContactedStr ? `<div style="margin-top:4px">${lastContactedStr}</div>` : ''}
         <div class="tags" style="margin-top:10px">
           ${statusPill}
           ${tags}
@@ -1222,6 +1280,7 @@ function buildPopup(d) {
       </div>
       <div class="contact-section">
         <div class="contact-section-title">Contact log <span class="count">· ${logs.length}</span></div>
+        ${dupWarning}
         ${buildContactHistory(d.id)}
         <button class="log-btn" onclick="openModal('${d.id}','${d.name.replace(/'/g,"\\'")}', '${(d.postcode||'').replace(/'/g,"\\'")}')">+ Log contact</button>
       </div>
@@ -1304,12 +1363,16 @@ function updateCount() {
 
 /* ── Contact pipeline stats ──────────────────────────────── */
 function updateContactStats() {
-  const counts = { none: 0, "No Answer": 0, "Interested": 0, "Follow Up": 0, "Converted": 0, "Existing Customer": 0, "Not Interested": 0, "Removed from MCS Database": 0 };
+  const counts = { none: 0, overdue: 0, "No Answer": 0, "Interested": 0, "Follow Up": 0, "Converted": 0, "Existing Customer": 0, "Not Interested": 0, "Removed from MCS Database": 0 };
   allMarkers.forEach(m => {
     const latest = latestContact(m._d.id);
     if (!latest) counts.none++;
-    else counts[latest.outcome] = (counts[latest.outcome] || 0) + 1;
+    else {
+      counts[latest.outcome] = (counts[latest.outcome] || 0) + 1;
+      if (isOverdue(latest)) counts.overdue++;
+    }
   });
+  document.getElementById("stat-overdue").textContent       = counts.overdue.toLocaleString();
   document.getElementById("stat-none").textContent          = counts.none.toLocaleString();
   document.getElementById("stat-noanswer").textContent      = (counts["No Answer"]||0).toLocaleString();
   document.getElementById("stat-interested").textContent    = (counts["Interested"]||0).toLocaleString();
@@ -1518,6 +1581,29 @@ document.getElementById("cluster-toggle").addEventListener("change", e => {
 });
 document.getElementById("radius-toggle").addEventListener("change", e => {
   e.target.checked ? radiusCircle.addTo(map) : radiusCircle.remove();
+});
+
+function buildHeatmap() {
+  if (heatLayer) { heatLayer.remove(); heatLayer = null; }
+  // Only plot installers that have been contacted; weight by contact count
+  const points = allMarkers
+    .filter(m => contactMap[m._d.id]?.length > 0)
+    .map(m => {
+      const count = contactMap[m._d.id].length;
+      return [m._d.lat, m._d.lng, Math.min(count / 5, 1)];
+    });
+  heatLayer = L.heatLayer(points, {
+    radius: 30, blur: 22, maxZoom: 10,
+    gradient: { 0.2: '#dde9da', 0.5: '#5d8a64', 0.8: '#2f5a3d', 1.0: '#1a3d28' },
+  }).addTo(map);
+}
+
+document.getElementById("heat-toggle").addEventListener("change", e => {
+  if (e.target.checked) {
+    buildHeatmap();
+  } else {
+    if (heatLayer) { heatLayer.remove(); heatLayer = null; }
+  }
 });
 
 document.getElementById("reset").addEventListener("click", () => {
