@@ -1153,7 +1153,7 @@ let heatLayer     = null;
 function latestContact(id) {
   const list = contactMap[id];
   if (!list || !list.length) return null;
-  return list[0]; // loadContacts fetches ordered by contacted_at desc
+  return list.find(c => !c.deleted_at) || null;
 }
 
 // Build a pin-shape divIcon. Pin body = pipeline status color, or black
