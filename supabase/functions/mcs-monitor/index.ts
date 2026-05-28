@@ -46,22 +46,6 @@ const TECHNOLOGY_LABELS: Record<string, string> = {
 
 const TECH_KEYS = Object.keys(TECHNOLOGY_LABELS)
 
-const REGIONS: Record<string, [number, number]> = {
-  region_nationwide:           [54.50, -3.50],
-  region_east_midlands:        [52.80, -1.20],
-  region_eastern:              [52.20,  0.50],
-  region_london:               [51.51, -0.13],
-  region_north_east:           [54.97, -1.60],
-  region_north_west:           [53.48, -2.24],
-  region_northern_ireland:     [54.60, -6.72],
-  region_scotland:             [56.49, -4.20],
-  region_south_east:           [51.25,  0.50],
-  region_south_west:           [51.00, -3.00],
-  region_wales:                [52.10, -3.80],
-  region_west_midlands:        [52.48, -1.90],
-  region_yorkshire_humberside: [53.80, -1.55],
-}
-
 // ─── HTTP helpers ─────────────────────────────────────────────────────────────
 
 const BROWSER_HEADERS = {
@@ -125,22 +109,9 @@ async function fetchAllInstallers(nonce: string): Promise<RawInstaller[]> {
   const seenIds = new Set<string>()
   const all: RawInstaller[] = []
 
-  // Sweep 1: each region with all technologies
-  console.log('[Sweep 1] Regions ...')
-  for (const [region, [lat, lng]] of Object.entries(REGIONS)) {
-    const p = new URLSearchParams({
-      action: 'filter_installers', nonce, form_type: 'installers', search: '',
-      'region[]': region, user_searched_location: 'region',
-      lat: String(lat), lng: String(lng), per_page: '100',
-    })
-    for (const t of TECH_KEYS) p.append('technology[]', t)
-    await paginate(p, seenIds, all, region)
-    await sleep(400)
-  }
-  console.log(`[Sweep 1 done] ${all.length} unique installers`)
-
-  // Sweep 2: each technology nationwide (catches any missed by region sweep)
-  console.log('[Sweep 2] Technologies ...')
+  // Technology sweep: query each tech nationwide — covers all UK installers
+  // without the overhead of the region sweep (which caused wall-clock timeouts)
+  console.log('[Sweep] Technologies ...')
   for (const tech of TECH_KEYS) {
     const p = new URLSearchParams({
       action: 'filter_installers', nonce, form_type: 'installers', search: '',
@@ -150,7 +121,7 @@ async function fetchAllInstallers(nonce: string): Promise<RawInstaller[]> {
     await paginate(p, seenIds, all, tech)
     await sleep(200)
   }
-  console.log(`[Sweep 2 done] ${all.length} unique installers total`)
+  console.log(`[Sweep done] ${all.length} unique installers total`)
   return all
 }
 
