@@ -474,7 +474,8 @@ Deno.serve(async () => {
     .is('deleted_at', null)
     .order('contacted_at', { ascending: false })
 
-  const latestMap: Record<string, typeof contacts![0]> = {}
+  // deno-lint-ignore no-explicit-any
+  const latestMap: Record<string, any> = {}
   for (const c of contacts ?? []) {
     if (!latestMap[c.installer_id]) latestMap[c.installer_id] = c
   }
