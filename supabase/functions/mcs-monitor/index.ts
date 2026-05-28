@@ -189,36 +189,58 @@ const GITHUB_HEADERS = {
   'Content-Type': 'application/json',
 }
 
-async function getGitHubFile(path: string): Promise<{ text: string; sha: string } | null> {
-  const resp = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${path}`, {
+// Uses the Git Data API so GitHub encodes the blob — avoids CPU-intensive
+// base64 on our side and handles files larger than the 1MB Contents API limit.
+async function pushInstallerJson(content: string): Promise<void> {
+  // 1. Create blob (utf-8 — GitHub stores as base64 internally)
+  const blobResp = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/git/blobs`, {
+    method: 'POST', headers: GITHUB_HEADERS,
+    body: JSON.stringify({ content, encoding: 'utf-8' }),
+  })
+  if (!blobResp.ok) throw new Error(`Blob create ${blobResp.status}: ${await blobResp.text()}`)
+  const { sha: blobSha } = await blobResp.json()
+
+  // 2. Get current commit + tree SHA from main branch
+  const refResp = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/git/refs/heads/main`, {
     headers: GITHUB_HEADERS,
   })
-  if (!resp.ok) return null
-  const data = await resp.json()
-  const raw = data.content.replace(/\n/g, '')
-  const bytes = Uint8Array.from(atob(raw), c => c.charCodeAt(0))
-  return { text: new TextDecoder().decode(bytes), sha: data.sha }
-}
+  if (!refResp.ok) throw new Error(`Ref fetch ${refResp.status}`)
+  const { object: { sha: commitSha } } = await refResp.json()
 
-function encodeBase64(str: string): string {
-  const bytes = new TextEncoder().encode(str)
-  let bin = ''
-  for (let i = 0; i < bytes.length; i += 8192)
-    bin += String.fromCharCode(...bytes.subarray(i, i + 8192))
-  return btoa(bin)
-}
-
-async function updateGitHubFile(path: string, content: string, sha: string): Promise<void> {
-  const resp = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${path}`, {
-    method: 'PUT',
+  const commitResp = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/git/commits/${commitSha}`, {
     headers: GITHUB_HEADERS,
+  })
+  if (!commitResp.ok) throw new Error(`Commit fetch ${commitResp.status}`)
+  const { tree: { sha: treeSha } } = await commitResp.json()
+
+  // 3. Create new tree pointing installers.json at the new blob
+  const newTreeResp = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/git/trees`, {
+    method: 'POST', headers: GITHUB_HEADERS,
     body: JSON.stringify({
-      message: 'chore: update installer data [skip ci]',
-      content: encodeBase64(content),
-      sha,
+      base_tree: treeSha,
+      tree: [{ path: MAP_FILE, mode: '100644', type: 'blob', sha: blobSha }],
     }),
   })
-  if (!resp.ok) throw new Error(`GitHub API ${resp.status}: ${await resp.text()}`)
+  if (!newTreeResp.ok) throw new Error(`Tree create ${newTreeResp.status}: ${await newTreeResp.text()}`)
+  const { sha: newTreeSha } = await newTreeResp.json()
+
+  // 4. Create new commit
+  const newCommitResp = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/git/commits`, {
+    method: 'POST', headers: GITHUB_HEADERS,
+    body: JSON.stringify({
+      message: 'chore: update installer data [skip ci]',
+      tree: newTreeSha, parents: [commitSha],
+    }),
+  })
+  if (!newCommitResp.ok) throw new Error(`Commit create ${newCommitResp.status}: ${await newCommitResp.text()}`)
+  const { sha: newCommitSha } = await newCommitResp.json()
+
+  // 5. Advance main branch to new commit
+  const patchResp = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/git/refs/heads/main`, {
+    method: 'PATCH', headers: GITHUB_HEADERS,
+    body: JSON.stringify({ sha: newCommitSha }),
+  })
+  if (!patchResp.ok) throw new Error(`Ref update ${patchResp.status}: ${await patchResp.text()}`)
 }
 
 // ─── Email HTML ───────────────────────────────────────────────────────────────
@@ -424,26 +446,14 @@ Deno.serve(async () => {
   if (upsertErr) console.warn('DB upsert warning:', upsertErr)
   else console.log(`Upserted ${upsertRows.length} IDs into installer_ids`)
 
-  // 5. Merge installers.json and push to GitHub
-  const fileInfo = await getGitHubFile(MAP_FILE)
-  const existingMap: Record<string, MapRecord> = {}
-  if (fileInfo) {
-    try {
-      const arr: MapRecord[] = JSON.parse(fileInfo.text)
-      for (const r of arr) if (r.id) existingMap[r.id] = r
-    } catch (e) {
-      console.warn('Could not parse existing installers.json:', e)
-    }
-  }
-  for (const inst of installers) {
-    if (inst.installer_id) existingMap[inst.installer_id] = toMapRecord(inst)
-  }
-  if (fileInfo) {
-    const mapJson = JSON.stringify(Object.values(existingMap))
-    await updateGitHubFile(MAP_FILE, mapJson, fileInfo.sha)
-    console.log(`installers.json updated — ${Object.keys(existingMap).length} total records`)
-  } else {
-    console.warn('installers.json not found on GitHub — skipping update')
+  // 5. Build installers.json from fresh fetch and push to GitHub
+  const mapRecords = installers.filter(i => i.installer_id).map(toMapRecord)
+  const mapJson    = JSON.stringify(mapRecords)
+  try {
+    await pushInstallerJson(mapJson)
+    console.log(`installers.json pushed — ${mapRecords.length} records`)
+  } catch (e) {
+    console.warn('GitHub push failed:', e)
   }
 
   // 6. First run: seed complete, no email
