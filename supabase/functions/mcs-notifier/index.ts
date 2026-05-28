@@ -84,18 +84,26 @@ function installerCard(inst: RawInstaller): string {
 Deno.serve(async () => {
   console.log('=== MCS Notifier ===')
 
-  // 1. Fetch pending new-installer alerts
+  // 1. Fetch pending new-installer alerts (sample only — avoid giant emails)
+  const CARD_LIMIT = 10
   const { data: pending, error: pendingErr } = await db
     .from('mcs_new_installers')
     .select('id, installer_data')
     .is('notified_at', null)
+    .limit(CARD_LIMIT)
 
   if (pendingErr) {
     console.error('DB error (mcs_new_installers):', pendingErr)
     return new Response(JSON.stringify({ error: pendingErr }), { status: 500 })
   }
 
-  console.log(`Pending new installers: ${pending?.length ?? 0}`)
+  // Get total count (may exceed CARD_LIMIT)
+  const { count: totalNewCount } = await db
+    .from('mcs_new_installers')
+    .select('id', { count: 'exact', head: true })
+    .is('notified_at', null)
+  const newCount = totalNewCount ?? 0
+  console.log(`Pending new installers: ${newCount}`)
 
   // 2. Fetch today's follow-ups
   const ukToday = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' })
@@ -111,8 +119,7 @@ Deno.serve(async () => {
     return new Response(JSON.stringify({ error: fuErr }), { status: 500 })
   }
 
-  const newCount = pending?.length ?? 0
-  const fuCount  = followUps?.length ?? 0
+  const fuCount = followUps?.length ?? 0
 
   if (newCount === 0 && fuCount === 0) {
     console.log('Nothing to report today')
@@ -124,12 +131,17 @@ Deno.serve(async () => {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
   })
 
-  // 3. Build new-installer section
+  // 3. Build new-installer section (capped at CARD_LIMIT cards)
+  const sampleCount = pending?.length ?? 0
+  const overflowNote = newCount > sampleCount
+    ? `<p style="font-size:12px;color:#666;margin:0 0 14px">Showing ${sampleCount} of ${newCount} — <a href="${MAP_URL}">view all on the map</a>.</p>`
+    : ''
   const newInstallerHtml = newCount > 0 ? `
     <div style="margin-bottom:28px">
       <h2 style="font-size:15px;color:#1a5276;border-bottom:2px solid #1a5276;padding-bottom:6px;margin-bottom:14px">
         ${newCount} New MCS Installer${newCount > 1 ? 's' : ''} Detected
       </h2>
+      ${overflowNote}
       ${(pending ?? []).map(row => installerCard(row.installer_data as RawInstaller)).join('')}
     </div>` : ''
 

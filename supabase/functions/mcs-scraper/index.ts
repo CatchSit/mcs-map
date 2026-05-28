@@ -233,12 +233,13 @@ Deno.serve(async () => {
       { onConflict: 'installer_id' }
     )
     // Queue for email notification
-    await db.from('mcs_new_installers').insert(
+    await db.from('mcs_new_installers').upsert(
       newInstallers.map(i => ({
         installer_id:   i.installer_id,
         installer_name: String(i.name ?? '').trim(),
         installer_data: i,
-      }))
+      })),
+      { onConflict: 'installer_id', ignoreDuplicates: true }
     )
     console.log(`Queued ${newInstallers.length} new installers for notification`)
 
