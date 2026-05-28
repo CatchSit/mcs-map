@@ -446,14 +446,17 @@ Deno.serve(async () => {
   if (upsertErr) console.warn('DB upsert warning:', upsertErr)
   else console.log(`Upserted ${upsertRows.length} IDs into installer_ids`)
 
-  // 5. Build installers.json from fresh fetch and push to GitHub
-  const mapRecords = installers.filter(i => i.installer_id).map(toMapRecord)
-  const mapJson    = JSON.stringify(mapRecords)
-  try {
-    await pushInstallerJson(mapJson)
-    console.log(`installers.json pushed — ${mapRecords.length} records`)
-  } catch (e) {
-    console.warn('GitHub push failed:', e)
+  // 5. Push installers.json only when new installers are detected (saves CPU on quiet days)
+  if (newInstallers.length > 0) {
+    const mapRecords = installers.filter(i => i.installer_id).map(toMapRecord)
+    try {
+      await pushInstallerJson(JSON.stringify(mapRecords))
+      console.log(`installers.json pushed — ${mapRecords.length} records`)
+    } catch (e) {
+      console.warn('GitHub push failed:', e)
+    }
+  } else {
+    console.log('No new installers — skipping installers.json update')
   }
 
   // 6. First run: seed complete, no email
