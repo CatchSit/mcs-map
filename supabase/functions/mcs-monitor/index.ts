@@ -101,27 +101,41 @@ async function paginate(
       break
     }
     page++
-    await sleep(200)
+    await sleep(100)
   }
 }
 
 async function fetchAllInstallers(nonce: string): Promise<RawInstaller[]> {
+  // Run all technology queries in parallel — wall-clock time = slowest single
+  // query rather than the sum of all queries
+  console.log(`[Sweep] ${TECH_KEYS.length} technology queries in parallel ...`)
+
+  const techResults = await Promise.all(
+    TECH_KEYS.map(async tech => {
+      const localSeen = new Set<string>()
+      const localAll:  RawInstaller[] = []
+      const p = new URLSearchParams({
+        action: 'filter_installers', nonce, form_type: 'installers', search: '',
+        'technology[]': tech, user_searched_location: 'region',
+        lat: '54.50', lng: '-3.50', per_page: '100',
+      })
+      await paginate(p, localSeen, localAll, tech)
+      return localAll
+    })
+  )
+
+  // Merge with global deduplication
   const seenIds = new Set<string>()
   const all: RawInstaller[] = []
-
-  // Technology sweep: query each tech nationwide — covers all UK installers
-  // without the overhead of the region sweep (which caused wall-clock timeouts)
-  console.log('[Sweep] Technologies ...')
-  for (const tech of TECH_KEYS) {
-    const p = new URLSearchParams({
-      action: 'filter_installers', nonce, form_type: 'installers', search: '',
-      'technology[]': tech, user_searched_location: 'region',
-      lat: '54.50', lng: '-3.50', per_page: '100',
-    })
-    await paginate(p, seenIds, all, tech)
-    await sleep(200)
+  for (const list of techResults) {
+    for (const inst of list) {
+      if (inst.installer_id && !seenIds.has(inst.installer_id)) {
+        seenIds.add(inst.installer_id)
+        all.push(inst)
+      }
+    }
   }
-  console.log(`[Sweep done] ${all.length} unique installers total`)
+  console.log(`[Sweep done] ${all.length} unique installers`)
   return all
 }
 
