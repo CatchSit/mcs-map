@@ -436,15 +436,19 @@ Deno.serve(async () => {
     : installers.filter(i => i.installer_id && !knownIds.has(i.installer_id))
   console.log(`New installers: ${newInstallers.length}`)
 
-  // 4. Upsert all fetched IDs into installer_ids (cumulative — never removes)
-  const upsertRows = installers
-    .filter(i => i.installer_id)
-    .map(i => ({ installer_id: i.installer_id, installer_name: String(i.name ?? '').trim() }))
-  const { error: upsertErr } = await db
-    .from('installer_ids')
-    .upsert(upsertRows, { onConflict: 'installer_id' })
-  if (upsertErr) console.warn('DB upsert warning:', upsertErr)
-  else console.log(`Upserted ${upsertRows.length} IDs into installer_ids`)
+  // 4. Insert only NEW installers — existing ones are already in the DB
+  if (newInstallers.length > 0) {
+    const insertRows = newInstallers
+      .filter(i => i.installer_id)
+      .map(i => ({ installer_id: i.installer_id, installer_name: String(i.name ?? '').trim() }))
+    const { error: insertErr } = await db
+      .from('installer_ids')
+      .upsert(insertRows, { onConflict: 'installer_id' })
+    if (insertErr) console.warn('DB insert warning:', insertErr)
+    else console.log(`Inserted ${insertRows.length} new IDs into installer_ids`)
+  } else {
+    console.log('No new installers — skipping DB insert')
+  }
 
   // 5. Push installers.json only when new installers are detected (saves CPU on quiet days)
   if (newInstallers.length > 0) {
