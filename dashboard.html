@@ -183,7 +183,7 @@
     .btn-clear:hover { background: var(--surface2); color: var(--text); }
 
     /* ── Table ───────────────────────────────── */
-    .table-wrap { background: var(--surface); border-radius: 14px; border: 1px solid var(--border); overflow: hidden; }
+    .table-wrap { background: var(--surface); border-radius: 14px; border: 1px solid var(--border); overflow-y: hidden; overflow-x: auto; }
     .table-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
     .table-header h2 { font-size: 14px; font-weight: 600; color: var(--text); }
     .table-header #result-count { font-size: 12.5px; color: var(--text3); }
@@ -327,7 +327,7 @@
       .filter-actions { width: 100%; margin-left: 0; }
       .btn-apply, .btn-clear { flex: 1; }
       .table-header { flex-direction: column; align-items: flex-start; }
-      .table-wrap { overflow-x: auto; }
+
       table { min-width: 720px; }
     }
     @media (max-width: 480px) {

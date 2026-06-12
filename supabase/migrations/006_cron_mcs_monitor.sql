@@ -11,7 +11,8 @@ SELECT cron.schedule(
   $$
   SELECT net.http_post(
     url     := 'https://teezsldwkpwzgvfizial.supabase.co/functions/v1/mcs-monitor',
-    headers := '{"Content-Type":"application/json","Authorization":"Bearer <anon_key>"}'::jsonb,
+    headers := '{"Content-Type":"application/json","Authorization":"Bearer <eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRlZXpzbGR3a3B3emd2Zml6aWFsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5NzUxMjAsImV4cCI6MjA5NDU1MTEyMH0.8rRoiHuS98HZp4jHSYbL31J3O9fn36tKEy9ooosPoGU
+>"}'::jsonb,
     body    := '{}'::jsonb
   )
   $$

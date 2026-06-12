@@ -29,6 +29,7 @@ This is a **static HTML project** — no Node.js, no bundler, no build step. All
 mcs-map/
 ├── index.html                          # Main map interface
 ├── dashboard.html                      # CRM/manager dashboard
+├── followups.html                      # Dedicated follow-ups page (overdue/upcoming)
 ├── installers.json                     # Installer data (refreshed daily)
 ├── HANDOVER.md                         # This file
 ├── shared/
@@ -72,6 +73,14 @@ Key JavaScript globals:
 - `WAREHOUSE` — `[53.5436, -1.0992]` (Amco warehouse, Unit 8 Wheatley Hall Trade Park, Doncaster DN2 4NH). Centre of the 50-mile delivery radius circle.
 
 Auth flow: `db.auth.getSession()` on load → if session exists, call `startApp()` which fetches `installers.json`, calls `initMap()`, then `loadContacts()`. `onAuthStateChange` handles the post-OAuth redirect case.
+
+### `followups.html`
+Dedicated follow-ups page. Lists all installers whose **latest** contact record has `outcome = 'Follow Up'`, grouped into three buckets: Overdue (follow-up date in the past), Due today, and Upcoming (sub-grouped by date). Each card shows installer name, logged date, employee, notes, next action, and a days-overdue/due-today/days-remaining badge.
+
+- **Log contact button** on every card — opens the same Log Contact modal as the map page (outcome chips, notes, next action, follow-up date). After saving, `loadFollowups()` re-runs. If the new outcome is anything other than "Follow Up", that card disappears automatically (because the new record becomes the latest contact and is not a follow-up).
+- **Auth** — same Microsoft Azure AD login as the other pages. Domain restriction to `@amcorenewables.co.uk`.
+- **Nav badge** in the top nav reflects the count of open follow-ups.
+- Follow-up date picker in the modal defaults to **today + 1 day** when "Follow Up" is selected.
 
 ### `dashboard.html`
 Manager/team dashboard. Single self-contained file.
@@ -187,9 +196,11 @@ Executable SQL lives in `supabase/migrations/` — that is the authoritative sou
 - RLS policy enforces ownership at database level (not just frontend)
 - Pipeline stats in sidebar (counts per outcome)
 - Follow-up email digest — Supabase Edge Function sends morning emails (7am UTC weekdays) to employees with follow-ups due that day
+- Dedicated follow-ups page (`followups.html`) — overdue / due-today / upcoming buckets, with Log Contact modal on each card so the team can act without leaving the page
+- Follow-up date picker defaults to **today + 1** (changed from +7) in the Log Contact modal on both the map page and the follow-ups page
+- Dashboard CRM table horizontally scrollable — edit/delete column no longer clipped off-screen on narrow viewports
 
 ### Not Started / Potential Future Work
-- **Follow-ups page** — the nav badge links back to the dashboard; a dedicated page listing overdue and upcoming follow-ups would be more useful.
 - **Bulk actions** on the dashboard (bulk delete, bulk reassign).
 - **User management UI** — adding/removing admin emails currently requires a code change and redeploy.
 - **UUID-based ownership** — the `employee` field stores a display name string; if someone's Azure AD name changes, old records won't be recognised as theirs. Adding a `user_id uuid` column would fix this.
@@ -330,10 +341,10 @@ The period toggle (Today/Week/Month/Year/All) on the dashboard controls the char
 3. `installers.json` must be present. If missing, the map will show "Failed to load installer data."
 
 ### Suggested next steps
-1. **Dedicated Follow-ups page** — the nav badge links to the dashboard; a filtered view of overdue and upcoming follow-ups would be more actionable.
-2. **UUID-based ownership** — add a `user_id uuid` column to `contacts`, populate on insert via `db.auth.getUser()`, migrate RLS to `auth.uid() = user_id`. Makes ownership robust against Azure AD name changes.
-3. **Admin email as Supabase config** — replace hardcoded `greg@amcorenewables.co.uk` in JS and RLS with an `admins` table lookup, so admin access can be changed without a code deploy.
-4. **Follow-up overdue highlighting** — in the dashboard table, highlight rows where `follow_up_date < today` and outcome is still "Follow Up".
+1. **UUID-based ownership** — add a `user_id uuid` column to `contacts`, populate on insert via `db.auth.getUser()`, migrate RLS to `auth.uid() = user_id`. Makes ownership robust against Azure AD name changes.
+2. **Admin email as Supabase config** — replace hardcoded `greg@amcorenewables.co.uk` in JS and RLS with an `admins` table lookup, so admin access can be changed without a code deploy.
+3. **Follow-up overdue highlighting** — in the dashboard table, highlight rows where `follow_up_date < today` and outcome is still "Follow Up".
+4. **Bulk actions** on the dashboard (bulk delete, bulk reassign).
 
 ### Context a new Claude needs
 - **No build toolchain** — don't suggest npm, webpack, or TypeScript unless the user explicitly wants to add them.

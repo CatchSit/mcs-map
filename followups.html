@@ -138,6 +138,73 @@
       .fu-card { flex-direction: column; gap: 10px; }
       .fu-card-right { flex-direction: row; align-items: center; }
     }
+
+    /* ── Log contact button on each card ────────── */
+    .fu-log-btn {
+      font-size: 12px; padding: 5px 11px; border-radius: 7px;
+      background: var(--accent); border: none; color: #fff;
+      cursor: pointer; font-family: inherit;
+      transition: filter .12s; white-space: nowrap;
+    }
+    .fu-log-btn:hover { filter: brightness(1.08); }
+
+    /* ── Modal ──────────────────────────────────── */
+    @keyframes dayFadeIn  { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes daySlideIn { from { transform: translateY(8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+    #modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(31,33,23,.4); backdrop-filter: blur(3px);
+      z-index: 9998; align-items: center; justify-content: center; padding: 24px;
+    }
+    #modal-overlay.open { display: flex; animation: dayFadeIn .15s; }
+    #modal {
+      background: var(--surface); border-radius: 16px;
+      width: 560px; max-width: 100%; max-height: 92vh; overflow: hidden;
+      box-shadow: 0 24px 64px rgba(0,0,0,.22); border: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      animation: daySlideIn .22s cubic-bezier(.2,.7,.3,1);
+    }
+    .modal-header { padding: 22px 24px 18px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; }
+    .modal-header-text { flex: 1; }
+    .modal-eyebrow { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: .08em; }
+    #modal h2 { font-size: 20px; font-weight: 600; letter-spacing: -0.015em; color: var(--text); margin-top: 4px; }
+    .modal-sub { font-size: 12.5px; color: var(--text2); margin-top: 3px; }
+    .modal-close { background: transparent; border: 0; color: var(--text3); font-size: 18px; padding: 6px; border-radius: 6px; cursor: pointer; }
+    .modal-close:hover { background: var(--surface2); color: var(--text); }
+    .modal-body { padding: 22px 24px; overflow-y: auto; flex: 1; }
+    .modal-body label { display: block; font-size: 12.5px; font-weight: 500; color: var(--text); margin-bottom: 8px; }
+    .modal-body .required { color: var(--alert); margin-left: 3px; }
+    .modal-body input[type="text"],
+    .modal-body input[type="date"],
+    .modal-body textarea {
+      width: 100%; padding: 11px 14px; background: var(--surface2);
+      border: 1px solid var(--border); border-radius: 10px;
+      font-size: 13.5px; color: var(--text); outline: none; font-family: inherit;
+      margin-bottom: 16px; transition: border-color .12s, background .12s;
+    }
+    .modal-body input:focus, .modal-body textarea:focus { border-color: var(--accent); background: var(--surface); }
+    .modal-body input[readonly] { background: var(--surface2); color: var(--text2); }
+    .modal-body textarea { resize: vertical; min-height: 80px; line-height: 1.5; }
+    .outcome-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+    .outcome-chip { padding: 8px 14px; font-size: 12.5px; background: var(--surface2); border: 1px solid var(--border); border-radius: 100px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; color: var(--text); font-family: inherit; transition: all .12s; }
+    .outcome-chip:hover { border-color: var(--borderH); }
+    .outcome-chip .chip-dot { width: 7px; height: 7px; border-radius: 50%; }
+    .outcome-chip.on { color: #fff; font-weight: 500; }
+    .outcome-chip.on .chip-dot { background: #fff !important; }
+    .modal-footer { padding: 16px 24px; border-top: 1px solid var(--border); background: var(--surface2); display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .modal-shortcuts { font-size: 11.5px; color: var(--text3); }
+    .modal-btns { display: flex; gap: 8px; }
+    .btn-primary { padding: 10px 22px; background: var(--accent); color: #fff; border: 0; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; font-family: inherit; transition: filter .12s, opacity .12s; }
+    .btn-primary:hover { filter: brightness(1.05); }
+    .btn-primary:disabled { opacity: 0.6; cursor: default; }
+    .btn-secondary { padding: 10px 18px; background: transparent; color: var(--text2); border: 1px solid var(--border); border-radius: 8px; font-size: 13px; cursor: pointer; font-family: inherit; transition: background .12s, color .12s; }
+    .btn-secondary:hover { background: var(--surface); color: var(--text); }
+
+    /* ── Toast ──────────────────────────────────── */
+    #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--text); color: #fff; padding: 12px 18px; border-radius: 10px; font-size: 13px; font-weight: 500; box-shadow: 0 8px 24px rgba(0,0,0,.2); z-index: 10001; display: none; align-items: center; gap: 12px; }
+    #toast.show { display: flex; animation: dayFadeIn .2s; }
+    #toast .toast-check { width: 18px; height: 18px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 11px; display: flex; align-items: center; justify-content: center; }
   </style>
 </head>
 <body>
@@ -202,6 +269,61 @@
   <div class="page-sub">Installers currently marked as "Follow Up" — grouped by due date.</div>
   <div id="content"><div id="loading-msg">Loading…</div></div>
 </main>
+
+<!-- ── Toast ─────────────────────────────────────────────── -->
+<div id="toast"><span class="toast-check">✓</span><span id="toast-message"></span></div>
+
+<!-- ── Log Contact Modal ─────────────────────────────────── -->
+<div id="modal-overlay">
+  <div id="modal">
+    <div class="modal-header">
+      <div class="modal-header-text">
+        <div class="modal-eyebrow">Log contact</div>
+        <h2 id="modal-installer-name">—</h2>
+        <div class="modal-sub" id="modal-installer-meta"></div>
+      </div>
+      <button class="modal-close" id="modal-close-btn" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="modal-installer-id"/>
+      <label>Your name</label>
+      <input type="text" id="modal-employee" placeholder="Enter your name…"/>
+      <label>Outcome <span class="required">*</span></label>
+      <div class="outcome-chips">
+        <button type="button" class="outcome-chip" data-value="Interested"       data-color="--status-interested-c"><span class="chip-dot" style="background:var(--status-interested-c)"></span>Interested</button>
+        <button type="button" class="outcome-chip" data-value="Follow Up"        data-color="--status-followup-c"><span class="chip-dot" style="background:var(--status-followup-c)"></span>Follow up</button>
+        <button type="button" class="outcome-chip" data-value="Converted"        data-color="--status-converted-c"><span class="chip-dot" style="background:var(--status-converted-c)"></span>Converted</button>
+        <button type="button" class="outcome-chip" data-value="Existing Customer" data-color="--status-existing-c"><span class="chip-dot" style="background:var(--status-existing-c)"></span>Existing customer</button>
+        <button type="button" class="outcome-chip" data-value="Not Interested"   data-color="--status-notint-c"><span class="chip-dot" style="background:var(--status-notint-c)"></span>Not interested</button>
+        <button type="button" class="outcome-chip" data-value="No Answer"        data-color="--status-noanswer-c"><span class="chip-dot" style="background:var(--status-noanswer-c)"></span>No answer</button>
+      </div>
+      <select id="modal-outcome" style="display:none">
+        <option value=""></option>
+        <option value="Interested">Interested</option>
+        <option value="Follow Up">Follow Up</option>
+        <option value="Converted">Converted</option>
+        <option value="Existing Customer">Existing Customer</option>
+        <option value="Not Interested">Not Interested</option>
+        <option value="No Answer">No Answer</option>
+      </select>
+      <div id="followup-date-group" style="display:none">
+        <label>Follow-up date <span class="required">*</span></label>
+        <input type="date" id="modal-followup-date"/>
+      </div>
+      <label>Notes <span style="color:var(--text3);font-weight:400;font-size:11.5px">— optional</span></label>
+      <textarea id="modal-notes" placeholder="What was said? Action items? Any sensitivities?"></textarea>
+      <label>Next action <span style="color:var(--text3);font-weight:400;font-size:11.5px">— optional</span></label>
+      <textarea id="modal-next-action" placeholder="What needs to happen next…"></textarea>
+    </div>
+    <div class="modal-footer">
+      <span class="modal-shortcuts">Esc to cancel · ⌘+↵ to save</span>
+      <div class="modal-btns">
+        <button class="btn-secondary" id="modal-cancel">Cancel</button>
+        <button class="btn-primary"   id="modal-submit">Save log</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="shared/escape-html.js"></script>
@@ -382,7 +504,7 @@ function renderCard(r, today, type) {
     ? `<div class="fu-next">→ ${escapeHtml(r.next_action)}</div>`
     : '';
 
-  const mapLink = `index.html`;
+  const safeName = (r.installer_name || '').replace(/'/g, "\\'");
 
   return `<div class="fu-card ${overdueClass}">
     <div class="fu-card-left">
@@ -393,7 +515,8 @@ function renderCard(r, today, type) {
     <div class="fu-card-right">
       ${daysBadge}
       <div class="fu-employee">${escapeHtml(r.employee || '')}</div>
-      <a href="${mapLink}" class="fu-open-btn" title="Open on map">View on map →</a>
+      <button class="fu-log-btn" onclick="openModal('${r.installer_id}','${safeName}')">+ Log contact</button>
+      <a href="index.html" class="fu-open-btn" title="Open on map">View on map →</a>
     </div>
   </div>`;
 }
@@ -404,6 +527,133 @@ db.auth.getSession().then(({ data: { session } }) => {
 });
 db.auth.onAuthStateChange((event, session) => {
   if (event === 'SIGNED_IN' && session?.user) { onAuthenticated(session.user); loadFollowups(); }
+});
+
+/* ── Log Contact Modal ─────────────────────────────────── */
+
+function openModal(id, name) {
+  document.getElementById('modal-installer-id').value          = id;
+  document.getElementById('modal-installer-name').textContent  = name;
+  document.getElementById('modal-installer-meta').textContent  = '';
+  document.getElementById('modal-outcome').value               = '';
+  document.getElementById('modal-notes').value                 = '';
+  document.getElementById('modal-next-action').value           = '';
+  document.getElementById('modal-followup-date').value         = '';
+  document.getElementById('followup-date-group').style.display = 'none';
+  document.querySelectorAll('.outcome-chip').forEach(c => {
+    c.classList.remove('on');
+    c.style.background  = '';
+    c.style.borderColor = '';
+  });
+  const empField = document.getElementById('modal-employee');
+  if (currentUser) {
+    empField.value    = getUserName(currentUser);
+    empField.readOnly = true;
+  } else {
+    empField.value    = '';
+    empField.readOnly = false;
+  }
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+document.querySelectorAll('.outcome-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    const value = chip.dataset.value;
+    const cvar  = chip.dataset.color;
+    document.querySelectorAll('.outcome-chip').forEach(c => {
+      c.classList.remove('on');
+      c.style.background  = '';
+      c.style.borderColor = '';
+    });
+    chip.classList.add('on');
+    const color = getComputedStyle(document.documentElement).getPropertyValue(cvar).trim();
+    chip.style.background  = color;
+    chip.style.borderColor = color;
+    const sel = document.getElementById('modal-outcome');
+    sel.value = value;
+    sel.dispatchEvent(new Event('change'));
+  });
+});
+
+document.getElementById('modal-outcome').addEventListener('change', e => {
+  const group = document.getElementById('followup-date-group');
+  if (e.target.value === 'Follow Up') {
+    group.style.display = 'block';
+    const input = document.getElementById('modal-followup-date');
+    const todayStr = new Date().toISOString().slice(0, 10);
+    input.min = todayStr;
+    if (!input.value) {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      input.value = tomorrow.toISOString().slice(0, 10);
+    }
+  } else {
+    group.style.display = 'none';
+  }
+});
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+}
+
+document.getElementById('modal-cancel').addEventListener('click', closeModal);
+document.getElementById('modal-close-btn').addEventListener('click', closeModal);
+document.getElementById('modal-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal-overlay')) closeModal();
+});
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('modal-overlay').classList.contains('open')) return;
+  if (e.key === 'Escape') closeModal();
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') document.getElementById('modal-submit').click();
+});
+
+function showToast(message) {
+  const el = document.getElementById('toast');
+  document.getElementById('toast-message').textContent = message;
+  el.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+document.getElementById('modal-submit').addEventListener('click', async () => {
+  const id       = document.getElementById('modal-installer-id').value;
+  const employee = document.getElementById('modal-employee').value.trim();
+  const outcome  = document.getElementById('modal-outcome').value;
+  const notes    = document.getElementById('modal-notes').value.trim();
+  const name     = document.getElementById('modal-installer-name').textContent;
+
+  if (!employee) { alert('Please enter your name.'); return; }
+  if (!outcome)  { alert('Please pick an outcome.'); return; }
+  if (outcome === 'Follow Up' && !document.getElementById('modal-followup-date').value) {
+    alert('Please set a follow-up date.'); return;
+  }
+
+  const btn = document.getElementById('modal-submit');
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  const followUpDate = outcome === 'Follow Up'
+    ? (document.getElementById('modal-followup-date').value || null)
+    : null;
+
+  const { error } = await db.from('contacts').insert([{
+    installer_id:   id,
+    installer_name: name,
+    employee,
+    outcome,
+    notes,
+    follow_up_date:  followUpDate,
+    employee_email:  currentUser?.email || null,
+    next_action:     document.getElementById('modal-next-action').value.trim() || null,
+  }]);
+
+  btn.disabled = false; btn.textContent = 'Save log';
+
+  if (error) { alert('Failed to save: ' + error.message); return; }
+
+  closeModal();
+  showToast(`Logged "${outcome}" for ${name}`);
+  // Reload the list — if the new outcome is not "Follow Up" the card disappears automatically
+  loadFollowups();
 });
 </script>
 </body>

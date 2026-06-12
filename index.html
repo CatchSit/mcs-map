@@ -1476,9 +1476,9 @@ document.getElementById('modal-outcome').addEventListener('change', e => {
     const input = document.getElementById('modal-followup-date');
     input.min = todayStr;
     if (!input.value) {
-      const sevenDays = new Date();
-      sevenDays.setDate(sevenDays.getDate() + 7);
-      input.value = sevenDays.toISOString().slice(0, 10);
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      input.value = tomorrow.toISOString().slice(0, 10);
     }
   } else {
     group.style.display = 'none';
