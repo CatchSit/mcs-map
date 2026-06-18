@@ -100,8 +100,27 @@ async function paginate(
   }
 }
 
+// Region centres — each query returns installers sorted by distance from that point,
+// giving a different geographic slice to complement the technology sweep.
+const REGIONS: Record<string, [string, string]> = {
+  region_nationwide:           ['54.50', '-3.50'],
+  region_east_midlands:        ['52.80', '-1.20'],
+  region_eastern:              ['52.20',  '0.50'],
+  region_london:               ['51.51', '-0.13'],
+  region_north_east:           ['54.97', '-1.60'],
+  region_north_west:           ['53.48', '-2.24'],
+  region_northern_ireland:     ['54.60', '-6.72'],
+  region_scotland:             ['56.49', '-4.20'],
+  region_south_east:           ['51.25',  '0.50'],
+  region_south_west:           ['51.00', '-3.00'],
+  region_wales:                ['52.10', '-3.80'],
+  region_west_midlands:        ['52.48', '-1.90'],
+  region_yorkshire_humberside: ['53.80', '-1.55'],
+}
+
 async function fetchAllInstallers(nonce: string): Promise<RawInstaller[]> {
-  console.log(`[Sweep] ${TECH_KEYS.length} technology queries in parallel ...`)
+  // Sweep 1: one query per technology, from UK centre.
+  console.log(`[Sweep 1] ${TECH_KEYS.length} technology queries in parallel ...`)
   const techResults = await Promise.all(
     TECH_KEYS.map(async tech => {
       const localSeen = new Set<string>()
@@ -115,6 +134,8 @@ async function fetchAllInstallers(nonce: string): Promise<RawInstaller[]> {
       return localAll
     })
   )
+
+  // Merge sweep 1 results.
   const seenIds = new Set<string>()
   const all: RawInstaller[] = []
   for (const list of techResults)
@@ -122,7 +143,36 @@ async function fetchAllInstallers(nonce: string): Promise<RawInstaller[]> {
       if (inst.installer_id && !seenIds.has(inst.installer_id)) {
         seenIds.add(inst.installer_id); all.push(inst)
       }
-  console.log(`[Sweep done] ${all.length} unique installers`)
+  console.log(`[Sweep 1 done] ${all.length} unique installers`)
+
+  // Sweep 2: one query per region (all technologies), from that region's centre.
+  // Each region centre produces a distance-sorted slice, catching installers the
+  // tech sweep missed because they were beyond the API's result cap from UK centre.
+  console.log(`[Sweep 2] ${Object.keys(REGIONS).length} region queries in parallel ...`)
+  const regionResults = await Promise.all(
+    Object.entries(REGIONS).map(async ([region, [lat, lng]]) => {
+      const localSeen = new Set<string>()
+      const localAll:  RawInstaller[] = []
+      const p = new URLSearchParams({
+        action: 'filter_installers', nonce, form_type: 'installers', search: '',
+        user_searched_location: 'region', lat, lng, per_page: '100',
+      })
+      for (const tech of TECH_KEYS) p.append('technology[]', tech)
+      p.append('region[]', region)
+      await paginate(p, localSeen, localAll, region)
+      return localAll
+    })
+  )
+
+  // Merge sweep 2 results — only add installers not already seen in sweep 1.
+  let sweep2New = 0
+  for (const list of regionResults)
+    for (const inst of list)
+      if (inst.installer_id && !seenIds.has(inst.installer_id)) {
+        seenIds.add(inst.installer_id); all.push(inst); sweep2New++
+      }
+  console.log(`[Sweep 2 done] ${sweep2New} additional installers — ${all.length} total`)
+
   return all
 }
 
