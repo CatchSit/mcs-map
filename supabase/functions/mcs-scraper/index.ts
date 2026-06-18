@@ -90,7 +90,7 @@ async function paginate(
         if (iid && !seenIds.has(iid)) { seenIds.add(iid); all.push(inst); newCount++ }
       }
       console.log(`  ${label} p${page}: ${batch.length} in, ${newCount} new (${all.length} total)`)
-      if (newCount === 0 || page >= 500) break
+      if (batch.length < 100 || page >= 500) break
     } catch (e) {
       console.warn(`[WARN] ${label} p${page}:`, e)
       break
