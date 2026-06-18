@@ -293,11 +293,21 @@ Deno.serve(async () => {
     )
     console.log(`Queued ${newInstallers.length} new installers for notification`)
 
-    // Push updated installers.json to GitHub
+    // Push updated installers.json to GitHub — only if fetch is larger than what's
+    // already there, so a rate-limited run can never shrink the map.
     try {
-      const mapJson = JSON.stringify(installers.filter(i => i.installer_id).map(toMapRecord))
-      await pushInstallerJson(mapJson)
-      console.log('installers.json pushed')
+      const currentResp = await fetch(
+        `https://raw.githubusercontent.com/${GITHUB_REPO}/main/${MAP_FILE}`,
+        { headers: { 'Cache-Control': 'no-cache' } }
+      )
+      const currentCount = currentResp.ok ? (await currentResp.json() as unknown[]).length : 0
+      if (installers.length >= currentCount) {
+        const mapJson = JSON.stringify(installers.filter(i => i.installer_id).map(toMapRecord))
+        await pushInstallerJson(mapJson)
+        console.log(`installers.json pushed (${installers.length} records, was ${currentCount})`)
+      } else {
+        console.warn(`Skipping push — fetched ${installers.length} but map already has ${currentCount}. Likely rate-limited.`)
+      }
     } catch (e) {
       console.warn('GitHub push failed:', e)
     }
