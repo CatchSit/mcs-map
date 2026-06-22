@@ -132,13 +132,25 @@ Fetches all MCS-certified installers, detects new ones, and updates the map.
 
 1. Loads all known installer IDs from the `installer_ids` table.
 2. Fetches a fresh WordPress nonce from `mcscertified.com/find-an-installer/`.
-3. Queries `admin-ajax.php` (`action=filter_installers`) for each of the 13 technology types in **parallel**, paginating until the API returns a partial page (genuine end of results) or 500 pages.
-4. Diffs fetched IDs against `installer_ids` to find new installers.
+3. Runs **two parallel sweeps** to maximise coverage (the MCS API caps results per query at ~5,500, but the real database has ~8,550 installers):
+   - **Sweep 1 — Technology** (13 queries): one query per technology type, coordinates set to UK centre `(54.50, -3.50)`. Results sorted by distance from UK centre.
+   - **Sweep 2 — Region** (13 queries): one query per regional centre (London, Scotland, South West, Wales, etc.) with all technologies included. Each centre produces a different distance-sorted slice, catching installers the tech sweep missed at the geographic edges.
+   - Each query paginates until the API returns a partial page (genuine end of results) or 500 pages.
+   - Results are deduplicated by `installer_id` across both sweeps.
+4. Diffs combined results against `installer_ids` to find new installers.
 5. If new installers found:
    - Upserts their IDs into `installer_ids`.
    - Upserts their full data into `mcs_new_installers` (staging table, `notified_at = null`).
+   - **Before pushing `installers.json`**: reads the current record count from GitHub. Only pushes if the new fetch is ≥ the existing count — prevents a rate-limited run from shrinking the map.
    - Pushes updated `installers.json` to GitHub via the Git Data API.
 6. On first run (empty `installer_ids`): seeds the table without queuing notifications.
+
+**Rate limiting:** MCS throttles repeated requests from the same IP. Running the scraper multiple times in quick succession triggers throttling and returns ~200–300 results instead of ~5,500+. The rate-limit guard (step 5) prevents the map from being overwritten in this case. If you see log output like `Skipping push — fetched 239 but map already has 5501`, the scraper was throttled and the map was protected. The daily cron schedule (one run per weekday morning) stays well within MCS's limits.
+
+**Backfill warning:** If `installer_ids` is ever reset or partially cleared, the next scrape will treat thousands of existing installers as "new" and queue them all in `mcs_new_installers`. Before `mcs-notifier` fires, clear the staging table to avoid a misleading bulk email:
+```sql
+DELETE FROM mcs_new_installers WHERE notified_at IS NULL;
+```
 
 ### `mcs-notifier` — runs 08:05 UTC Mon–Fri
 Sends a daily email to `greg@amcorenewables.co.uk` combining two sections:
@@ -275,7 +287,7 @@ The `contacts_update_policy` uses `COALESCE(NULLIF(full_name,''), NULLIF(name,''
 - **Admin email as Supabase config** — replace hardcoded `greg@amcorenewables.co.uk` in JS and Edge Functions with an `admins` table lookup.
 - **Follow-up overdue highlighting** — in the dashboard table, highlight rows where `follow_up_date < today` and outcome is still "Follow Up".
 - **Bulk actions** on the dashboard (bulk delete, bulk reassign).
-- **Region sweep in mcs-scraper** — currently fetches one query per technology type. Adding a region-centre sweep (as well as per-tech) would improve coverage of installers at the edges of the UK.
+- **Close the remaining ~3,000 installer gap** — the MCS website shows ~8,550 installers (90/page × 95 pages) but the scraper currently reaches ~5,500. The two-sweep strategy narrows this gap; further improvement could come from querying by postcode district to get deterministic geographic slices.
 
 ---
 
@@ -362,8 +374,8 @@ HTML pages are intentionally self-contained. Keep it this way — it removes the
 ### Period toggle vs. table filter are independent
 The period toggle (Today/Week/Month/Year/All) on the dashboard controls charts and the Contacts card only. The date range filter controls the contact log table only. They do not interact.
 
-### mcs-scraper only pushes installers.json when new installers are found
-If a daily run finds no new MCS installers, `installers.json` is not touched. This is intentional — no-op runs produce no commit noise.
+### mcs-scraper only pushes installers.json when new installers are found AND the count is safe
+If a daily run finds no new MCS installers, `installers.json` is not touched. If new ones are found but the total fetched is less than the current file size (rate-limited run), the push is also skipped. No-op and throttled runs produce no commit noise and cannot shrink the map.
 
 ---
 
