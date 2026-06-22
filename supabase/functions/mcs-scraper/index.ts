@@ -100,26 +100,29 @@ async function paginate(
   }
 }
 
-// Region centres — each query returns installers sorted by distance from that point,
-// giving a different geographic slice to complement the technology sweep.
-const REGIONS: Record<string, [string, string]> = {
-  region_nationwide:           ['54.50', '-3.50'],
-  region_east_midlands:        ['52.80', '-1.20'],
-  region_eastern:              ['52.20',  '0.50'],
-  region_london:               ['51.51', '-0.13'],
-  region_north_east:           ['54.97', '-1.60'],
-  region_north_west:           ['53.48', '-2.24'],
-  region_northern_ireland:     ['54.60', '-6.72'],
-  region_scotland:             ['56.49', '-4.20'],
-  region_south_east:           ['51.25',  '0.50'],
-  region_south_west:           ['51.00', '-3.00'],
-  region_wales:                ['52.10', '-3.80'],
-  region_west_midlands:        ['52.48', '-1.90'],
-  region_yorkshire_humberside: ['53.80', '-1.55'],
-}
+// Coordinate centres for sweep 2. Each produces a distance-sorted view of the
+// full installer database with NO region filter, so the API returns all UK
+// installers sorted nearest-first from that point. Different centres surface
+// different installers beyond the per-query result cap.
+const CENTRES: Array<[string, string, string]> = [
+  ['54.50', '-3.50',  'uk-centre'],
+  ['51.51', '-0.13',  'london'],
+  ['56.49', '-4.20',  'scotland'],
+  ['51.00', '-3.00',  'south-west'],
+  ['52.10', '-3.80',  'wales'],
+  ['54.60', '-6.72',  'northern-ireland'],
+  ['53.48', '-2.24',  'north-west'],
+  ['54.97', '-1.60',  'north-east'],
+  ['52.80', '-1.20',  'east-midlands'],
+  ['51.25',  '0.50',  'south-east'],
+  ['52.20',  '0.50',  'eastern'],
+  ['52.48', '-1.90',  'west-midlands'],
+  ['53.80', '-1.55',  'yorkshire'],
+]
 
 async function fetchAllInstallers(nonce: string): Promise<RawInstaller[]> {
-  // Sweep 1: one query per technology, from UK centre.
+  // Sweep 1: one query per technology, no region filter, from UK centre.
+  // Catches installers sorted by proximity to UK centre for each tech type.
   console.log(`[Sweep 1] ${TECH_KEYS.length} technology queries in parallel ...`)
   const techResults = await Promise.all(
     TECH_KEYS.map(async tech => {
@@ -145,12 +148,12 @@ async function fetchAllInstallers(nonce: string): Promise<RawInstaller[]> {
       }
   console.log(`[Sweep 1 done] ${all.length} unique installers`)
 
-  // Sweep 2: one query per region (all technologies), from that region's centre.
-  // Each region centre produces a distance-sorted slice, catching installers the
-  // tech sweep missed because they were beyond the API's result cap from UK centre.
-  console.log(`[Sweep 2] ${Object.keys(REGIONS).length} region queries in parallel ...`)
-  const regionResults = await Promise.all(
-    Object.entries(REGIONS).map(async ([region, [lat, lng]]) => {
+  // Sweep 2: all technologies, NO region filter, from 13 different coordinate centres.
+  // The MCS API sorts by distance from the given lat/lng. Querying from different
+  // centres surfaces installers that were beyond the result cap from UK centre.
+  console.log(`[Sweep 2] ${CENTRES.length} coordinate queries in parallel ...`)
+  const centreResults = await Promise.all(
+    CENTRES.map(async ([lat, lng, label]) => {
       const localSeen = new Set<string>()
       const localAll:  RawInstaller[] = []
       const p = new URLSearchParams({
@@ -158,15 +161,15 @@ async function fetchAllInstallers(nonce: string): Promise<RawInstaller[]> {
         user_searched_location: 'region', lat, lng, per_page: '100',
       })
       for (const tech of TECH_KEYS) p.append('technology[]', tech)
-      p.append('region[]', region)
-      await paginate(p, localSeen, localAll, region)
+      // No region[] param — returns all UK installers, not filtered to a service area
+      await paginate(p, localSeen, localAll, label)
       return localAll
     })
   )
 
   // Merge sweep 2 results — only add installers not already seen in sweep 1.
   let sweep2New = 0
-  for (const list of regionResults)
+  for (const list of centreResults)
     for (const inst of list)
       if (inst.installer_id && !seenIds.has(inst.installer_id)) {
         seenIds.add(inst.installer_id); all.push(inst); sweep2New++
