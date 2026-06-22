@@ -278,7 +278,7 @@ Deno.serve(async () => {
     : installers.filter(i => i.installer_id && !knownIds.has(i.installer_id))
   console.log(`New: ${newInstallers.length}`)
 
-  // 4. Persist new installers
+  // 4. Persist new installers and update the map cumulatively
   if (newInstallers.length > 0) {
     // Insert into known IDs table
     await db.from('installer_ids').upsert(
@@ -296,21 +296,26 @@ Deno.serve(async () => {
     )
     console.log(`Queued ${newInstallers.length} new installers for notification`)
 
-    // Push updated installers.json to GitHub — only if fetch is larger than what's
-    // already there, so a rate-limited run can never shrink the map.
+    // Merge this run's results on top of the existing installers.json.
+    // This means the map can only grow — a throttled run that fetches fewer
+    // installers still adds its new records without removing existing ones.
     try {
       const currentResp = await fetch(
         `https://raw.githubusercontent.com/${GITHUB_REPO}/main/${MAP_FILE}`,
         { headers: { 'Cache-Control': 'no-cache' } }
       )
-      const currentCount = currentResp.ok ? (await currentResp.json() as unknown[]).length : 0
-      if (installers.length >= currentCount) {
-        const mapJson = JSON.stringify(installers.filter(i => i.installer_id).map(toMapRecord))
-        await pushInstallerJson(mapJson)
-        console.log(`installers.json pushed (${installers.length} records, was ${currentCount})`)
-      } else {
-        console.warn(`Skipping push — fetched ${installers.length} but map already has ${currentCount}. Likely rate-limited.`)
+      type MapRecord = ReturnType<typeof toMapRecord>
+      const existing: MapRecord[] = currentResp.ok ? await currentResp.json() : []
+      // Build a map of existing records by installer_id, then overlay this run's records
+      const merged = new Map<string, MapRecord>(
+        existing.map(r => [r.installer_id, r])
+      )
+      for (const inst of installers) {
+        if (inst.installer_id) merged.set(inst.installer_id, toMapRecord(inst))
       }
+      const mapJson = JSON.stringify([...merged.values()])
+      await pushInstallerJson(mapJson)
+      console.log(`installers.json pushed — ${merged.size} records (was ${existing.length}, fetched ${installers.length})`)
     } catch (e) {
       console.warn('GitHub push failed:', e)
     }
