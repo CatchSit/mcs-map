@@ -133,19 +133,18 @@ Fetches all MCS-certified installers, detects new ones, and updates the map.
 1. Loads all known installer IDs from the `installer_ids` table.
 2. Fetches a fresh WordPress nonce from `mcscertified.com/find-an-installer/`.
 3. Runs **two parallel sweeps** to maximise coverage (the MCS API caps results per query at ~5,500, but the real database has ~8,550 installers):
-   - **Sweep 1 — Technology** (13 queries): one query per technology type, coordinates set to UK centre `(54.50, -3.50)`. Results sorted by distance from UK centre.
-   - **Sweep 2 — Region** (13 queries): one query per regional centre (London, Scotland, South West, Wales, etc.) with all technologies included. Each centre produces a different distance-sorted slice, catching installers the tech sweep missed at the geographic edges.
+   - **Sweep 1 — Technology** (13 queries): one query per technology type, no region filter, coordinates set to UK centre `(54.50, -3.50)`. Results sorted nearest-first.
+   - **Sweep 2 — Coordinate** (13 queries): all technologies combined, no region filter, one query per geographic centre (London, Scotland, South West, Wales, etc.). Each centre produces a differently-sorted full UK result set, surfacing installers that were beyond the cap from UK centre.
    - Each query paginates until the API returns a partial page (genuine end of results) or 500 pages.
    - Results are deduplicated by `installer_id` across both sweeps.
 4. Diffs combined results against `installer_ids` to find new installers.
 5. If new installers found:
    - Upserts their IDs into `installer_ids`.
    - Upserts their full data into `mcs_new_installers` (staging table, `notified_at = null`).
-   - **Before pushing `installers.json`**: reads the current record count from GitHub. Only pushes if the new fetch is ≥ the existing count — prevents a rate-limited run from shrinking the map.
-   - Pushes updated `installers.json` to GitHub via the Git Data API.
+   - Reads the current `installers.json` from GitHub, merges this run's records on top (existing records updated, new ones added, none removed), and pushes the result. The map can only ever grow — a throttled run that fetches fewer records still adds its new discoveries without removing anything.
 6. On first run (empty `installer_ids`): seeds the table without queuing notifications.
 
-**Rate limiting:** MCS throttles repeated requests from the same IP. Running the scraper multiple times in quick succession triggers throttling and returns ~200–300 results instead of ~5,500+. The rate-limit guard (step 5) prevents the map from being overwritten in this case. If you see log output like `Skipping push — fetched 239 but map already has 5501`, the scraper was throttled and the map was protected. The daily cron schedule (one run per weekday morning) stays well within MCS's limits.
+**Rate limiting:** MCS throttles repeated requests from the same IP. Running the scraper multiple times in quick succession (e.g. manual testing) returns ~200–300 results instead of ~5,500+. Because the map update is cumulative (merge on top), even a rate-limited run safely adds the records it did find. The daily cron schedule (one run per weekday morning) stays well within MCS's limits.
 
 **Backfill warning:** If `installer_ids` is ever reset or partially cleared, the next scrape will treat thousands of existing installers as "new" and queue them all in `mcs_new_installers`. Before `mcs-notifier` fires, clear the staging table to avoid a misleading bulk email:
 ```sql
@@ -374,8 +373,8 @@ HTML pages are intentionally self-contained. Keep it this way — it removes the
 ### Period toggle vs. table filter are independent
 The period toggle (Today/Week/Month/Year/All) on the dashboard controls charts and the Contacts card only. The date range filter controls the contact log table only. They do not interact.
 
-### mcs-scraper only pushes installers.json when new installers are found AND the count is safe
-If a daily run finds no new MCS installers, `installers.json` is not touched. If new ones are found but the total fetched is less than the current file size (rate-limited run), the push is also skipped. No-op and throttled runs produce no commit noise and cannot shrink the map.
+### mcs-scraper uses a cumulative merge — the map can only grow
+If a daily run finds no new installers, `installers.json` is not touched. If new installers are found, the scraper reads the existing file from GitHub, overlays the current run's records on top (updating existing entries, adding new ones, removing nothing), and pushes the merged result. A throttled run that fetches only 200 records out of 5,500+ still safely adds its new discoveries — it cannot shrink the map.
 
 ---
 
@@ -405,5 +404,4 @@ SELECT * FROM cron.job;
 ### Suggested next steps
 1. **UUID-based ownership** — add `user_id uuid` to `contacts`, populate on insert via `auth.uid()`, migrate RLS.
 2. **Admin email as config** — replace hardcoded emails in JS and Edge Functions with an `admins` table.
-3. **Region sweep in mcs-scraper** — add a second sweep querying by region centre coordinates to improve installer coverage beyond the current ~5,500.
-4. **Follow-up overdue highlighting** — highlight rows in the dashboard table where `follow_up_date < today` and outcome is still "Follow Up".
+3. **Follow-up overdue highlighting** — highlight rows in the dashboard table where `follow_up_date < today` and outcome is still "Follow Up".
