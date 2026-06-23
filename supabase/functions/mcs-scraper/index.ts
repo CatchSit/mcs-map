@@ -346,33 +346,41 @@ async function pushInstallerJson(content: string): Promise<void> {
 Deno.serve(async () => {
   console.log('=== MCS Scraper ===')
 
-  // 1. Load known installer IDs
-  const { data: knownRows, error: dbErr } = await db
-    .from('installer_ids').select('installer_id').limit(100000)
-  if (dbErr) return new Response(JSON.stringify({ error: dbErr }), { status: 500 })
-
-  const knownIds = new Set((knownRows ?? []).map((r: { installer_id: string }) => r.installer_id))
-  const firstRun = knownIds.size === 0
-  console.log(`Known IDs: ${knownIds.size}${firstRun ? ' — first run' : ''}`)
+  // 1. Is this a first run? (installer_ids empty)
+  const { count: knownCount } = await db
+    .from('installer_ids').select('*', { count: 'exact', head: true })
+  const firstRun = (knownCount ?? 0) === 0
+  console.log(`Known IDs in DB: ${knownCount}${firstRun ? ' — first run' : ''}`)
 
   // 2. Fetch all installers from MCS
   const nonce      = await getNonce()
   const installers = await fetchAllInstallers(nonce)
   console.log(`Fetched: ${installers.length}`)
 
-  // 3. Diff
+  // 3. Diff — query only the fetched IDs using batched .in() to stay under the
+  //    PostgREST 1000-row-per-request cap. This avoids loading all known IDs.
+  const fetchedIds = installers.map(i => i.installer_id).filter(Boolean) as string[]
+  const knownInFetch = new Set<string>()
+  const CHUNK = 900
+  for (let i = 0; i < fetchedIds.length; i += CHUNK) {
+    const chunk = fetchedIds.slice(i, i + CHUNK)
+    const { data } = await db.from('installer_ids').select('installer_id').in('installer_id', chunk)
+    for (const r of (data ?? [])) knownInFetch.add(r.installer_id)
+  }
+
   const newInstallers = firstRun
     ? []
-    : installers.filter(i => i.installer_id && !knownIds.has(i.installer_id))
-  console.log(`New: ${newInstallers.length}`)
+    : installers.filter(i => i.installer_id && !knownInFetch.has(i.installer_id))
+  console.log(`New: ${newInstallers.length} (known among fetched: ${knownInFetch.size})`)
 
   // 4. Persist new installers and update the map cumulatively
   if (newInstallers.length > 0) {
     // Insert into known IDs table
-    await db.from('installer_ids').upsert(
+    const { error: upsertErr } = await db.from('installer_ids').upsert(
       newInstallers.map(i => ({ installer_id: i.installer_id, installer_name: String(i.name ?? '').trim() })),
       { onConflict: 'installer_id' }
     )
+    if (upsertErr) console.error('installer_ids upsert error:', JSON.stringify(upsertErr))
     // Queue for email notification
     await db.from('mcs_new_installers').upsert(
       newInstallers.map(i => ({
@@ -394,12 +402,7 @@ Deno.serve(async () => {
       )
       type MapRecord = ReturnType<typeof toMapRecord>
       const existing: MapRecord[] = currentResp.ok ? await currentResp.json() : []
-      // Build a map of existing records by id (the field toMapRecord outputs),
-      // then overlay this run's records. Use installer_id as the key for new
-      // records — both refer to the same MCS ID value.
-      const merged = new Map<string, MapRecord>(
-        existing.map(r => [r.id, r])
-      )
+      const merged = new Map<string, MapRecord>(existing.map(r => [r.id, r]))
       for (const inst of installers) {
         if (inst.installer_id) merged.set(inst.installer_id, toMapRecord(inst))
       }
@@ -414,11 +417,13 @@ Deno.serve(async () => {
     const seedRows = installers
       .filter(i => i.installer_id)
       .map(i => ({ installer_id: i.installer_id, installer_name: String(i.name ?? '').trim() }))
-    await db.from('installer_ids').upsert(seedRows, { onConflict: 'installer_id' })
+    for (let i = 0; i < seedRows.length; i += CHUNK) {
+      await db.from('installer_ids').upsert(seedRows.slice(i, i + CHUNK), { onConflict: 'installer_id' })
+    }
     console.log(`First run — seeded ${seedRows.length} IDs, no notification queued`)
   } else {
     console.log('No new installers — nothing to do')
   }
 
-  return new Response(JSON.stringify({ fetched: installers.length, new: newInstallers.length }), { status: 200 })
+  return new Response(JSON.stringify({ fetched: installers.length, new: newInstallers.length, knownInDB: knownCount }), { status: 200 })
 })
