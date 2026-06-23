@@ -348,7 +348,7 @@ Deno.serve(async () => {
 
   // 1. Load known installer IDs
   const { data: knownRows, error: dbErr } = await db
-    .from('installer_ids').select('installer_id')
+    .from('installer_ids').select('installer_id').limit(100000)
   if (dbErr) return new Response(JSON.stringify({ error: dbErr }), { status: 500 })
 
   const knownIds = new Set((knownRows ?? []).map((r: { installer_id: string }) => r.installer_id))
