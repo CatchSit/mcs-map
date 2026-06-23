@@ -306,9 +306,11 @@ Deno.serve(async () => {
       )
       type MapRecord = ReturnType<typeof toMapRecord>
       const existing: MapRecord[] = currentResp.ok ? await currentResp.json() : []
-      // Build a map of existing records by installer_id, then overlay this run's records
+      // Build a map of existing records by id (the field toMapRecord outputs),
+      // then overlay this run's records. Use installer_id as the key for new
+      // records — both refer to the same MCS ID value.
       const merged = new Map<string, MapRecord>(
-        existing.map(r => [r.installer_id, r])
+        existing.map(r => [r.id, r])
       )
       for (const inst of installers) {
         if (inst.installer_id) merged.set(inst.installer_id, toMapRecord(inst))
