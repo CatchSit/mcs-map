@@ -1214,6 +1214,7 @@ function buildContactHistory(id) {
   if (!list || !list.length) return '<div class="no-contacts">No contacts logged yet — be the first.</div>';
   const myName = currentUser ? getUserName(currentUser) : null;
   return [...list]
+    .filter(c => !c.deleted_at)
     .sort((a, b) => new Date(b.contacted_at) - new Date(a.contacted_at))
     .slice(0, 4)
     .map(c => {
@@ -1225,7 +1226,7 @@ function buildContactHistory(id) {
       const next = c.next_action
         ? `<div class="contact-entry-next">→ ${escapeHtml(c.next_action)}</div>`
         : '';
-      const canResolve = c.outcome === 'Follow Up' && c.follow_up_date && !c.deleted_at
+      const canResolve = c.outcome === 'Follow Up' && !c.deleted_at
         && myName && (c.employee === myName || isAdmin(currentUser));
       const resolveBtn = canResolve
         ? `<button class="resolve-btn" onclick="resolveFollowUp('${c.id}','${id}')" title="Mark follow-up as done">✓</button>`
@@ -1246,16 +1247,16 @@ function buildContactHistory(id) {
 }
 
 async function resolveFollowUp(contactId, installerId) {
+  const now = new Date().toISOString();
   const { error } = await db.from('contacts').update({
-    follow_up_date: null,
-    updated_at: new Date().toISOString(),
-    updated_by: currentUser?.email || 'unknown',
+    deleted_at: now,
+    deleted_by: currentUser?.email || 'unknown',
   }).eq('id', contactId);
-  if (error) { showToast('Failed to clear follow-up'); return; }
-  // Patch local data so popup rebuilds immediately
+  if (error) { showToast('Failed to remove follow-up'); return; }
+  // Patch local data so popup and queue update immediately
   if (contactMap[installerId]) {
     const entry = contactMap[installerId].find(c => c.id === contactId);
-    if (entry) entry.follow_up_date = null;
+    if (entry) entry.deleted_at = now;
   }
   // Rebuild open popup
   const marker = allMarkers.find(m => m._d.id === installerId);
