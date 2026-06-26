@@ -310,6 +310,23 @@
     @keyframes dayFadeIn { from { opacity: 0; } to { opacity: 1; } }
     @keyframes daySlideIn { from { transform: translateY(8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
+    /* ── Installer hover tip ──────────────────────────────── */
+    #installer-tip {
+      position: fixed; z-index: 9999;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; box-shadow: 0 8px 28px rgba(0,0,0,.13);
+      padding: 13px 15px; width: 248px;
+      font-size: 12.5px; pointer-events: none;
+      opacity: 0; transition: opacity .1s; line-height: 1.5;
+    }
+    #installer-tip.visible { opacity: 1; }
+    #installer-tip .tip-name { font-weight: 600; font-size: 13px; color: var(--text); margin-bottom: 8px; line-height: 1.3; }
+    #installer-tip .tip-row { color: var(--text2); padding: 2px 0; display: flex; gap: 7px; align-items: flex-start; }
+    #installer-tip .tip-row a { color: var(--accent); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 195px; display: block; }
+    #installer-tip .tip-cert { font-size: 11px; color: var(--text3); margin-top: 7px; padding-top: 7px; border-top: 1px solid var(--border); }
+    #installer-tip .tip-na { color: var(--text3); font-style: italic; }
+    .ins-hover { cursor: default; border-bottom: 1px dotted var(--text3); display: inline; }
+
     @media (max-width: 1100px) { .charts-grid { grid-template-columns: 1fr 1fr; } }
     @media (max-width: 900px)  { .charts-grid { grid-template-columns: 1fr; } }
     @media (max-width: 768px) {
@@ -508,6 +525,7 @@
 </main>
 
 <div id="toast"><span class="toast-check">✓</span><span id="toast-message"></span></div>
+<div id="installer-tip"></div>
 
 <!-- Login screen -->
 <div id="login-screen">
@@ -1089,7 +1107,7 @@ function render() {
 
     return `<tr style="${rowStyle}">
       <td style="white-space:nowrap">${dateStr}<div style="color:var(--text3);font-size:11.5px;margin-top:2px">${timeStr}</div>${deletedBadge}${editedBadge}</td>
-      <td class="td-name">${escapeHtml(r.installer_name||'—')}</td>
+      <td class="td-name"><span class="ins-hover" data-iid="${r.installer_id}">${escapeHtml(r.installer_name||'—')}</span></td>
       <td style="color:var(--text2)">${escapeHtml(r.employee)}</td>
       <td><span class="outcome-pill" style="background:${soft};color:${color}"><span class="pill-dot" style="background:${color}"></span>${escapeHtml(label)}</span></td>
       ${followupCell}
@@ -1115,6 +1133,30 @@ function render() {
       showToast('Follow-up date updated');
     });
   });
+  // Installer hover tip
+  const _tip = document.getElementById('installer-tip');
+  document.querySelectorAll('.ins-hover[data-iid]').forEach(el => {
+    el.addEventListener('mousemove', e => {
+      const d = installersList ? installersList.find(x => x.id === el.dataset.iid) : null;
+      if (!d) {
+        _tip.innerHTML = `<div class="tip-na">Details not available</div>`;
+      } else {
+        const phone   = d.phone   ? `<div class="tip-row"><span>📞</span><span>${escapeHtml(d.phone)}</span></div>` : '';
+        const email   = d.email   ? `<div class="tip-row"><span>✉</span><a href="mailto:${escapeHtml(d.email)}">${escapeHtml(d.email)}</a></div>` : '';
+        const website = d.website ? `<div class="tip-row"><span>🌐</span><a href="${d.website}" target="_blank" rel="noopener">${escapeHtml(d.website.replace(/^https?:\/\//,''))}</a></div>` : '';
+        const loc     = d.postcode ? `<div class="tip-row"><span>📍</span><span>${escapeHtml(d.postcode)}</span></div>` : '';
+        const cert    = d.cert ? `<div class="tip-cert">${escapeHtml(d.cert_body||'')} · ${escapeHtml(d.cert)}</div>` : '';
+        _tip.innerHTML = `<div class="tip-name">${escapeHtml(d.name)}</div>${phone}${email}${website}${loc}${cert}`;
+      }
+      let x = e.clientX + 18, y = e.clientY + 10;
+      if (x + 248 > window.innerWidth - 8) x = e.clientX - 256;
+      _tip.style.left = x + 'px';
+      _tip.style.top  = y + 'px';
+      _tip.classList.add('visible');
+    });
+    el.addEventListener('mouseleave', () => _tip.classList.remove('visible'));
+  });
+
   renderPagination();
 }
 
